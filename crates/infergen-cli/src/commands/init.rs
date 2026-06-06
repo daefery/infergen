@@ -12,13 +12,13 @@ pub fn run(args: InitArgs) -> anyhow::Result<()> {
     let dir = &args.dir;
 
     // 1. Refuse to overwrite an existing config unless --force.
-    if let Some(existing) = Config::discover(dir) {
-        if !args.force {
-            anyhow::bail!(
-                "config already exists at {} (use --force to overwrite)",
-                existing.display()
-            );
-        }
+    if let Some(existing) = Config::discover(dir)
+        && !args.force
+    {
+        anyhow::bail!(
+            "config already exists at {} (use --force to overwrite)",
+            existing.display()
+        );
     }
 
     // 2. Detect the stack (tolerant; only errors if `dir` is missing).
