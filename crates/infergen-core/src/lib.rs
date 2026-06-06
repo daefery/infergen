@@ -1,11 +1,24 @@
 //! Infergen scan engine.
 //!
 //! This crate will house the language parsers (E0.3), framework adapters
-//! (E0.4), the heuristic namer (E1.2), and codegen (E2.x). For the E0.1
-//! scaffold it exposes only the shared error type and a version probe so the
-//! CLI and tooling can link against a real, testable surface.
+//! (E0.4), the heuristic namer (E1.2), and codegen (E2.x). E0.1 seeded the
+//! shared error type and a version probe; E0.2 adds the project config schema
+//! ([`config`]) and language/framework auto-detection ([`detect`]).
 
+use std::path::PathBuf;
+
+pub mod config;
+pub mod detect;
+
+pub use config::Config;
+pub use detect::{DetectionResult, Framework, Language, detect};
 pub use infergen_types::CATALOG_SCHEMA_VERSION;
+
+/// Version of the on-disk project config (`infergen.config.*`) schema.
+///
+/// Distinct from [`CATALOG_SCHEMA_VERSION`] (the catalog file). Bump on any
+/// breaking change to the config format.
+pub const CONFIG_SCHEMA_VERSION: u32 = 1;
 
 /// Errors produced by the scan engine.
 ///
@@ -17,6 +30,40 @@ pub enum Error {
     /// A subsystem exists in the API but is not yet implemented.
     #[error("not yet implemented: {0}")]
     NotImplemented(&'static str),
+
+    /// I/O failure reading or writing a file.
+    #[error("i/o error: {0}")]
+    Io(#[from] std::io::Error),
+
+    /// A config file could not be parsed (or serialized).
+    #[error("failed to parse config at {}: {message}", path.display())]
+    ConfigParse {
+        /// Path of the offending config file.
+        path: PathBuf,
+        /// Human-readable parse/serialize error message.
+        message: String,
+    },
+
+    /// No config file was found during discovery.
+    #[error("no infergen config found in {}", dir.display())]
+    ConfigNotFound {
+        /// Directory that was searched.
+        dir: PathBuf,
+    },
+
+    /// A config file already exists (e.g. `init` without `--force`).
+    #[error("config already exists at {} (use --force to overwrite)", path.display())]
+    ConfigExists {
+        /// Path of the existing config file.
+        path: PathBuf,
+    },
+
+    /// A file extension is not a supported config format.
+    #[error("unsupported config format: {} (expected .json or .toml)", path.display())]
+    UnsupportedFormat {
+        /// Path with the unsupported extension.
+        path: PathBuf,
+    },
 }
 
 /// Convenience result type for scan-engine fallible operations.
@@ -46,5 +93,18 @@ mod tests {
     #[test]
     fn reexports_schema_version() {
         assert_eq!(CATALOG_SCHEMA_VERSION, 1);
+    }
+
+    #[test]
+    fn config_schema_version_is_one() {
+        assert_eq!(CONFIG_SCHEMA_VERSION, 1);
+    }
+
+    #[test]
+    fn config_exists_error_formats() {
+        let e = Error::ConfigExists {
+            path: PathBuf::from("a.json"),
+        };
+        assert!(e.to_string().contains("--force"));
     }
 }

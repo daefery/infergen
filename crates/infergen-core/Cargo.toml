@@ -10,6 +10,12 @@ description = "Infergen scan engine: language parsers, framework adapters, namer
 [dependencies]
 infergen-types = { workspace = true }
 thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

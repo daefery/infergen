@@ -1,26 +1,30 @@
 //! Infergen CLI entrypoint.
-//!
-//! Subcommands (`init`, `scan`, `generate`, `check`, `watch`) arrive in epic
-//! E0.2. For E0.1 this binary proves the build graph: it links the core engine,
-//! parses `--version`/`--help`, and prints a scaffold banner.
+
+mod cli;
+mod commands;
 
 use clap::Parser;
 
-/// Infergen — scan code, infer a typed analytics catalog, generate a
-/// type-safe, multi-provider SDK.
-#[derive(Debug, Parser)]
-#[command(name = "infergen", version, about, long_about = None)]
-struct Cli {
-    // Subcommands land in E0.2.
-}
+use cli::Cli;
 
 fn main() -> anyhow::Result<()> {
-    let _cli = Cli::parse();
+    let cli = Cli::parse();
+    match cli.command {
+        Some(command) => commands::run(command),
+        None => {
+            print_banner();
+            Ok(())
+        }
+    }
+}
+
+/// Print the no-subcommand status banner.
+fn print_banner() {
     println!("infergen {}", env!("CARGO_PKG_VERSION"));
     println!("core engine {}", infergen_core::version());
     println!("catalog schema v{}", infergen_core::CATALOG_SCHEMA_VERSION);
-    println!("scaffold ready — commands land in E0.2");
-    Ok(())
+    println!("config schema v{}", infergen_core::CONFIG_SCHEMA_VERSION);
+    println!("run `infergen --help` to see commands");
 }
 
 #[cfg(test)]
