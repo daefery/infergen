@@ -116,12 +116,12 @@ fn detect_js(root: &Path, result: &mut DetectionResult) {
 
     // Gather dependency names (tolerant of malformed JSON).
     let mut deps: BTreeSet<String> = BTreeSet::new();
-    if let Some(text) = read_opt(&pkg_path) {
-        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
-            for key in ["dependencies", "devDependencies"] {
-                if let Some(map) = value.get(key).and_then(|v| v.as_object()) {
-                    deps.extend(map.keys().cloned());
-                }
+    if let Some(text) = read_opt(&pkg_path)
+        && let Ok(value) = serde_json::from_str::<serde_json::Value>(&text)
+    {
+        for key in ["dependencies", "devDependencies"] {
+            if let Some(map) = value.get(key).and_then(|v| v.as_object()) {
+                deps.extend(map.keys().cloned());
             }
         }
     }
@@ -207,10 +207,10 @@ fn detect_ruby(root: &Path, result: &mut DetectionResult) {
         return;
     }
     result.add_language(Language::Ruby);
-    if let Some(text) = read_opt(&gemfile) {
-        if text.to_lowercase().contains("rails") {
-            result.add_framework(Framework::Rails);
-        }
+    if let Some(text) = read_opt(&gemfile)
+        && text.to_lowercase().contains("rails")
+    {
+        result.add_framework(Framework::Rails);
     }
 }
 
