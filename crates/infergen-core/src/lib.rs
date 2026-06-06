@@ -7,10 +7,13 @@
 
 use std::path::PathBuf;
 
+pub mod adapter;
 pub mod config;
 pub mod detect;
 pub mod parser;
 
+pub use adapter::nextjs::NextjsAdapter;
+pub use adapter::{Adapter, EventKind, PropertyHint, ProposedEvent};
 pub use config::Config;
 pub use detect::{DetectionResult, Framework, Language, detect};
 pub use infergen_types::CATALOG_SCHEMA_VERSION;
