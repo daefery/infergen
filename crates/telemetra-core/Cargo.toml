@@ -1,0 +1,15 @@
+[package]
+name = "telemetra-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Telemetra scan engine: language parsers, framework adapters, namer, codegen."
+
+[dependencies]
+telemetra-types = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

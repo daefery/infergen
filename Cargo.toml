@@ -1,0 +1,48 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/telemetra/telemetra"
+authors = ["Telemetra contributors"]
+
+[workspace.dependencies]
+# Internal crates
+telemetra-types = { path = "crates/telemetra-types", version = "0.0.0" }
+telemetra-core  = { path = "crates/telemetra-core", version = "0.0.0" }
+# External
+clap      = { version = "4.5", features = ["derive"] }
+anyhow    = "1.0"
+thiserror = "2.0"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+# Config for 'dist'
+[workspace.metadata.dist]
+# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
+cargo-dist-version = "0.28.0"
+# CI backends to support
+ci = "github"
+# The installers to generate for each app
+installers = ["shell", "powershell"]
+# Target platforms to build apps for (Rust target-triple syntax)
+targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+# Which actions to run on pull requests
+pr-run-mode = "plan"
+# Path that installers should place binaries in
+install-path = "CARGO_HOME"
+# Whether to install an updater program
+install-updater = false
+
+[profile.dist]
+inherits = "release"
+lto = "thin"

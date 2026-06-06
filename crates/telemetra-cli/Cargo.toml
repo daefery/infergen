@@ -1,0 +1,24 @@
+[package]
+name = "telemetra-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Telemetra command-line interface."
+
+[[bin]]
+name = "telemetra"
+path = "src/main.rs"
+
+[dependencies]
+telemetra-core = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
+
+[lints]
+workspace = true
