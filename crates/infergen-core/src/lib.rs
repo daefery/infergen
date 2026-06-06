@@ -13,9 +13,9 @@ pub mod parser;
 
 pub use config::Config;
 pub use detect::{DetectionResult, Framework, Language, detect};
-pub use parser::{Diagnostic, LanguageParser, ParsedFile};
-pub use parser::js::JsParser;
 pub use infergen_types::CATALOG_SCHEMA_VERSION;
+pub use parser::js::JsParser;
+pub use parser::{Diagnostic, LanguageParser, ParsedFile};
 
 /// Version of the on-disk project config (`infergen.config.*`) schema.
 ///

@@ -177,8 +177,7 @@ export default add;
 
     #[test]
     fn with_program_counts_statements() {
-        let count =
-            JsParser::with_program(Path::new("app.ts"), VALID_TS, |prog| prog.body.len());
+        let count = JsParser::with_program(Path::new("app.ts"), VALID_TS, |prog| prog.body.len());
         // interface + function + export = 3 statements
         assert_eq!(count, 3);
     }

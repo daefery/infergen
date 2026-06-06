@@ -45,18 +45,11 @@ fn parse_broken_source_is_ok_not_err() {
 
 #[test]
 fn with_program_sees_export_default() {
-    let has_default_export = JsParser::with_program(
-        Path::new("config.ts"),
-        VALID_TS,
-        |prog| {
-            prog.body.iter().any(|stmt| {
-                matches!(
-                    stmt,
-                    oxc_ast::ast::Statement::ExportDefaultDeclaration(_)
-                )
-            })
-        },
-    );
+    let has_default_export = JsParser::with_program(Path::new("config.ts"), VALID_TS, |prog| {
+        prog.body
+            .iter()
+            .any(|stmt| matches!(stmt, oxc_ast::ast::Statement::ExportDefaultDeclaration(_)))
+    });
     assert!(has_default_export);
 }
 
