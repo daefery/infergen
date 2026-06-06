@@ -2,7 +2,7 @@
 
 A framework-agnostic library that scans any codebase offline, infers a typed analytics event catalog, and generates a type-safe, multi-provider SDK.
 
-**🚧 Pre-alpha — scaffold only (E0.1). Commands land in E0.2.**
+**🚧 Pre-alpha — CLI skeleton (E0.2). `init` detects your stack; `scan`/`generate`/`check`/`watch` are stubs.**
 
 ![CI](https://github.com/infergen/infergen/actions/workflows/ci.yml/badge.svg)
 
@@ -29,7 +29,7 @@ infergen/
 ├── crates/
 │   ├── infergen-types/            # shared, dependency-free domain types
 │   ├── infergen-core/             # scan-engine library (parsers/adapters land in E0.3+)
-│   └── infergen-cli/              # `infergen` binary (commands land in E0.2)
+│   └── infergen-cli/              # `infergen` binary (init + command stubs; E0.2)
 └── packages/
     └── runtime/                    # @infergen/runtime — TS runtime SDK seed
 ```
@@ -54,13 +54,30 @@ just ci           # full local CI parity
 cargo run -p infergen-cli -- --version
 ```
 
+## CLI usage
+
+```bash
+infergen init             # detect languages/frameworks, write infergen.config.json
+infergen init --format toml
+infergen init --force     # overwrite an existing config
+infergen scan             # stub — lands in E0.4
+infergen generate         # stub — lands in E2.1
+infergen check            # stub — lands in E4.2
+infergen watch            # stub — lands in E4.3
+```
+
+Config is discovered in the project root as `infergen.config.json` or
+`infergen.config.toml` (JSON takes precedence). The default catalog path is
+`.infergen/catalog.yaml`. Only `init` does real work today — the other commands
+are honest stubs that name the epic where they land.
+
 ## Architecture
 
 See [`PRD.md`](./PRD.md) §8 and [`ROADMAP.md`](./ROADMAP.md) for the full architecture.
 
 - `infergen-types` — leaf crate; shared domain types (catalog schema version, future event structs)
 - `infergen-core` — scan engine (parsers, adapters, namer, codegen — arriving E0.3–E2.x)
-- `infergen-cli` — the `infergen` binary (subcommands arriving E0.2)
+- `infergen-cli` — the `infergen` binary (`init` + config loader live; `scan`/`generate`/`check`/`watch` stubs)
 - `@infergen/runtime` — TypeScript runtime SDK (providers, batching arriving M3)
 
 ## License
