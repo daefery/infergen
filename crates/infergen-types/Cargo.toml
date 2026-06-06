@@ -1,11 +1,11 @@
 [package]
-name = "telemetra-types"
+name = "infergen-types"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Shared, dependency-free domain types for Telemetra (catalog schema versioning, etc.)."
+description = "Shared, dependency-free domain types for Infergen (catalog schema versioning, etc.)."
 
 [lints]
 workspace = true

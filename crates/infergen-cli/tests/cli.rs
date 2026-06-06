@@ -1,11 +1,11 @@
-//! Integration tests for the `telemetra` binary.
+//! Integration tests for the `infergen` binary.
 
 use assert_cmd::Command;
 use predicates::str::contains;
 
 #[test]
 fn prints_version_flag() {
-    Command::cargo_bin("telemetra")
+    Command::cargo_bin("infergen")
         .unwrap()
         .arg("--version")
         .assert()
@@ -15,7 +15,7 @@ fn prints_version_flag() {
 
 #[test]
 fn default_run_prints_scaffold_banner() {
-    Command::cargo_bin("telemetra")
+    Command::cargo_bin("infergen")
         .unwrap()
         .assert()
         .success()
@@ -25,10 +25,10 @@ fn default_run_prints_scaffold_banner() {
 
 #[test]
 fn help_flag_succeeds() {
-    Command::cargo_bin("telemetra")
+    Command::cargo_bin("infergen")
         .unwrap()
         .arg("--help")
         .assert()
         .success()
-        .stdout(contains("telemetra"));
+        .stdout(contains("infergen"));
 }

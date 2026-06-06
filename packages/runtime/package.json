@@ -1,7 +1,7 @@
 {
-  "name": "@telemetra/runtime",
+  "name": "@infergen/runtime",
   "version": "0.0.0",
-  "description": "Telemetra runtime SDK (seed). Providers, batching, and delivery land in Milestone 3.",
+  "description": "Infergen runtime SDK (seed). Providers, batching, and delivery land in Milestone 3.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.cjs",

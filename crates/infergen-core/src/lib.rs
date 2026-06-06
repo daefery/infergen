@@ -1,11 +1,11 @@
-//! Telemetra scan engine.
+//! Infergen scan engine.
 //!
 //! This crate will house the language parsers (E0.3), framework adapters
 //! (E0.4), the heuristic namer (E1.2), and codegen (E2.x). For the E0.1
 //! scaffold it exposes only the shared error type and a version probe so the
 //! CLI and tooling can link against a real, testable surface.
 
-pub use telemetra_types::CATALOG_SCHEMA_VERSION;
+pub use infergen_types::CATALOG_SCHEMA_VERSION;
 
 /// Errors produced by the scan engine.
 ///

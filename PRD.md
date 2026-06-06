@@ -1,4 +1,4 @@
-# Telemetra — Product Requirements Document
+# Infergen — Product Requirements Document
 
 > **One-liner:** A framework-agnostic library that scans any codebase offline, infers a typed analytics event catalog from project context, and generates a type-safe, multi-provider telemetry SDK — eliminating manual event planning, naming drift, and provider lock-in.
 
@@ -22,7 +22,7 @@ Existing tools (Avo, Segment Typewriter, Segment Protocols, RudderStack) solve *
 
 ## 2. Vision
 
-> Run one command in any repo. Telemetra reads your routes, forms, auth flows, API endpoints, and error boundaries, then hands you a reviewable, version-controlled event catalog and a generated type-safe SDK wired to the providers you choose. Edit the catalog, regenerate, ship. Your tracking plan can never drift from your code again — because it's *derived* from your code.
+> Run one command in any repo. Infergen reads your routes, forms, auth flows, API endpoints, and error boundaries, then hands you a reviewable, version-controlled event catalog and a generated type-safe SDK wired to the providers you choose. Edit the catalog, regenerate, ship. Your tracking plan can never drift from your code again — because it's *derived* from your code.
 
 **Principles:**
 - **Offline-first.** Core scanning, naming, and codegen run with zero network calls. No data leaves the machine. Optional local LLM (Ollama) for semantic naming, never a required cloud API.
@@ -53,7 +53,7 @@ Existing tools (Avo, Segment Typewriter, Segment Protocols, RudderStack) solve *
 
 ## 4. Target Users & Personas
 
-| Persona | Pain | What Telemetra gives them |
+| Persona | Pain | What Infergen gives them |
 |---|---|---|
 | **Solo dev / indie hacker** | No time to design a tracking plan; wants analytics "now" | One command → working, sensible events |
 | **Frontend engineer** | Hates writing/maintaining `track()` calls by hand | Generated typed SDK, autocomplete, compile-time safety |
@@ -65,13 +65,13 @@ Existing tools (Avo, Segment Typewriter, Segment Protocols, RudderStack) solve *
 
 ## 5. User Journey (Happy Path)
 
-1. `npx telemetra init` — detects frameworks, languages, monorepo layout. Writes a `telemetra.config.*`.
-2. `telemetra scan` — AST-parses the project, runs framework adapters + heuristic namer, proposes events.
-3. Telemetra writes `.telemetra/catalog.yaml` — the reviewable tracking plan.
+1. `npx infergen init` — detects frameworks, languages, monorepo layout. Writes a `infergen.config.*`.
+2. `infergen scan` — AST-parses the project, runs framework adapters + heuristic namer, proposes events.
+3. Infergen writes `.infergen/catalog.yaml` — the reviewable tracking plan.
 4. Dev reviews the diff, edits names/properties/providers, marks false positives as `ignored`.
-5. `telemetra generate` — emits a type-safe SDK + provider bindings into the project.
+5. `infergen generate` — emits a type-safe SDK + provider bindings into the project.
 6. Dev replaces ad-hoc tracking with generated, autocompleted calls: `track.userSignupCompleted({ method: 'google' })`.
-7. CI runs `telemetra scan --check` — fails the build if code introduces untracked moments or drifts from the catalog.
+7. CI runs `infergen scan --check` — fails the build if code introduces untracked moments or drifts from the catalog.
 8. Later: re-run `scan`. New events merge in as proposals; manual edits are preserved.
 
 ---
@@ -169,7 +169,7 @@ Existing tools (Avo, Segment Typewriter, Segment Protocols, RudderStack) solve *
 | Segment Typewriter | required | ✗ | partial | JS-centric | Segment only | ✓ |
 | Avo | required | ✗ | ✗ | limited | via Segment | ✓ |
 | RudderStack | required | ✗ | ✗ | ✓ | ✓ | partial |
-| **Telemetra** | **optional** | **✓** | **✓** | **✓** | **✓** | **✓** |
+| **Infergen** | **optional** | **✓** | **✓** | **✓** | **✓** | **✓** |
 
 **Core bet:** scan quality. If auto-detection produces a catalog people actually keep, everything else follows.
 
@@ -187,7 +187,7 @@ Existing tools (Avo, Segment Typewriter, Segment Protocols, RudderStack) solve *
 
 ## 11. Monetization & Licensing
 
-Telemetra is **open-source first**. Adoption is the moat: every solo developer and single-repo use case must be free, forever, with no friction. Revenue comes from **multi-team coordination, compliance, and hosting** — the surfaces where individuals feel no pain but organizations pay willingly.
+Infergen is **open-source first**. Adoption is the moat: every solo developer and single-repo use case must be free, forever, with no friction. Revenue comes from **multi-team coordination, compliance, and hosting** — the surfaces where individuals feel no pain but organizations pay willingly.
 
 ### 11.1 Model: Open-Core + Hosted Control Plane
 

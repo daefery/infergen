@@ -1,4 +1,4 @@
-# Contributing to Telemetra
+# Contributing to Infergen
 
 ## Dev environment
 
@@ -44,7 +44,7 @@ All steps must be green before opening a PR.
 
 **Binaries**: push a `v*` tag → the `release.yml` workflow triggers → `cargo-dist` builds and publishes a GitHub Release with per-platform archives and installer scripts.
 
-**npm (`@telemetra/runtime`)**: until E8.3 automates it, publish manually:
+**npm (`@infergen/runtime`)**: until E8.3 automates it, publish manually:
 
 ```bash
 pnpm -r build

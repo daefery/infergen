@@ -1,4 +1,4 @@
-# Telemetra — Roadmap
+# Infergen — Roadmap
 
 > Full-vision roadmap. Describes the **completed** product across all epics, from prototype to mature, extensible platform. Status reflects the journey: nothing built yet — everything `Planned` — but the table maps the entire arc so the end-state is visible.
 
@@ -13,7 +13,7 @@ Goal: validate the core bet (scan quality) on a single stack before generalizing
 | Epic No | Name | Status | Description | Note/Blocker/Dependency |
 |---|---|---|---|---|
 | E0.1 | Project Scaffold & Monorepo | Done | Set up the repo: CLI package, core engine, runtime SDK package, shared types, build/test/release tooling. Choose core language (Rust or Go for the CLI/scan engine for speed + single-binary distribution). | None — first work item. |
-| E0.2 | CLI Skeleton & Config | Planned | `telemetra` CLI with `init`, `scan`, `generate`, `check`, `watch` command stubs. Config schema (`telemetra.config.*`) + loader. Framework/language auto-detection on `init`. | Depends on E0.1. |
+| E0.2 | CLI Skeleton & Config | Planned | `infergen` CLI with `init`, `scan`, `generate`, `check`, `watch` command stubs. Config schema (`infergen.config.*`) + loader. Framework/language auto-detection on `init`. | Depends on E0.1. |
 | E0.3 | TS/JS AST Parser Integration | Planned | Integrate SWC/OXC to parse TypeScript/JavaScript into a normalized AST the scan engine consumes. Define the internal AST abstraction so other languages plug in later. | Depends on E0.1. Pick SWC vs OXC early. |
 | E0.4 | Next.js Adapter (vertical slice) | Planned | First framework adapter end-to-end: detect routes/pages, forms, auth (NextAuth), API routes → propose events. Proves the full pipeline on one stack. | Depends on E0.3. Core validation epic. |
 
@@ -100,7 +100,7 @@ Goal: lift detection quality beyond heuristics.
 
 ## Milestone 7 — Developer Experience & Ecosystem
 
-Goal: make Telemetra pleasant, visible, and extensible.
+Goal: make Infergen pleasant, visible, and extensible.
 
 | Epic No | Name | Status | Description | Note/Blocker/Dependency |
 |---|---|---|---|---|
