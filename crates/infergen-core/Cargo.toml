@@ -1,0 +1,15 @@
+[package]
+name = "infergen-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Infergen scan engine: language parsers, framework adapters, namer, codegen."
+
+[dependencies]
+infergen-types = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true
