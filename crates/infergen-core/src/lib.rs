@@ -15,6 +15,7 @@ pub mod linter;
 pub mod namer;
 pub mod parser;
 pub mod property;
+pub mod review;
 
 pub use adapter::nextjs::NextjsAdapter;
 pub use adapter::{Adapter, EventKind, PropertyHint, ProposedEvent};
@@ -28,6 +29,10 @@ pub use infergen_types::{
 pub use linter::{ConventionCase, LintRule, LintViolation, lint_catalog};
 pub use namer::{NameResult, NameSignals, Namer};
 pub use property::{enrich_hints, is_pii_property, type_from_name};
+pub use review::{
+    CatalogDiff, DiffEntry, EntryChange, approve, diff_catalogs, ignore, remove_property, rename,
+    set_description, upsert_property,
+};
 pub use parser::js::JsParser;
 pub use parser::{Diagnostic, LanguageParser, ParsedFile};
 
@@ -90,6 +95,22 @@ pub enum Error {
         /// Human-readable parse/serialize error message.
         message: String,
     },
+
+    /// An event ID was not found in the catalog.
+    #[error("event not found: {id}")]
+    EventNotFound {
+        /// The ID that was looked up.
+        id: String,
+    },
+
+    /// A proposed event name is invalid.
+    #[error("invalid event name {name:?}: {reason}")]
+    InvalidEventName {
+        /// The name that failed validation.
+        name: String,
+        /// Human-readable reason.
+        reason: String,
+    },
 }
 
 /// Convenience result type for scan-engine fallible operations.
@@ -142,5 +163,17 @@ mod tests {
         };
         assert!(e.to_string().contains("catalog.yaml"));
         assert!(e.to_string().contains("unexpected key"));
+    }
+
+    #[test]
+    fn event_not_found_error_formats() {
+        let e = Error::EventNotFound { id: "evt_abc123".into() };
+        assert!(e.to_string().contains("evt_abc123"));
+    }
+
+    #[test]
+    fn invalid_event_name_error_formats() {
+        let e = Error::InvalidEventName { name: "".into(), reason: "empty".into() };
+        assert!(e.to_string().contains("empty"));
     }
 }
