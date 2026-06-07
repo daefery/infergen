@@ -14,6 +14,7 @@ pub mod detect;
 pub mod linter;
 pub mod namer;
 pub mod parser;
+pub mod property;
 
 pub use adapter::nextjs::NextjsAdapter;
 pub use adapter::{Adapter, EventKind, PropertyHint, ProposedEvent};
@@ -26,6 +27,7 @@ pub use infergen_types::{
 };
 pub use linter::{ConventionCase, LintRule, LintViolation, lint_catalog};
 pub use namer::{NameResult, NameSignals, Namer};
+pub use property::{enrich_hints, is_pii_property, type_from_name};
 pub use parser::js::JsParser;
 pub use parser::{Diagnostic, LanguageParser, ParsedFile};
 
