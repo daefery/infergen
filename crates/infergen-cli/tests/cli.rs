@@ -603,6 +603,112 @@ fn generate_check_does_not_write_file() {
     assert_eq!(contents, sentinel, "--check must not overwrite the file");
 }
 
+// ── E4.4 check --json integration tests ─────────────────────────────────────
+
+#[test]
+fn check_json_clean_catalog_outputs_ok_true() {
+    let dir = tempdir().unwrap();
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    std::fs::write(
+        catalog_dir.join("catalog.yaml"),
+        minimal_catalog_yaml("evt_json0000000001", "page_viewed", "approved"),
+    )
+    .unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .args(["check", "--json"])
+        .assert()
+        .success()
+        .stdout(contains(r#""ok": true"#))
+        .stdout(contains(r#""issue_count": 0"#));
+}
+
+#[test]
+fn check_json_proposed_event_outputs_ok_false() {
+    let dir = tempdir().unwrap();
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    std::fs::write(
+        catalog_dir.join("catalog.yaml"),
+        minimal_catalog_yaml("evt_json0000000002", "signup_clicked", "proposed"),
+    )
+    .unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .args(["check", "--json"])
+        .assert()
+        .failure()
+        .stdout(contains(r#""ok": false"#))
+        .stdout(contains(r#""unreviewed""#))
+        .stdout(contains("signup_clicked"));
+}
+
+#[test]
+fn check_json_output_is_valid_json() {
+    let dir = tempdir().unwrap();
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    std::fs::write(
+        catalog_dir.join("catalog.yaml"),
+        minimal_catalog_yaml("evt_json0000000003", "page_viewed", "approved"),
+    )
+    .unwrap();
+    let output = infergen()
+        .current_dir(dir.path())
+        .args(["check", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = String::from_utf8_lossy(&output);
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("stdout must be valid JSON");
+    assert!(parsed.get("ok").is_some(), "JSON must have 'ok' field");
+    assert!(parsed.get("issue_count").is_some(), "JSON must have 'issue_count' field");
+    assert!(parsed.get("new_untracked").is_some(), "JSON must have 'new_untracked' field");
+    assert!(parsed.get("unreviewed").is_some(), "JSON must have 'unreviewed' field");
+    assert!(parsed.get("violations").is_some(), "JSON must have 'violations' field");
+}
+
+#[test]
+fn check_json_new_untracked_moment_contains_event_name() {
+    let dir = tempdir().unwrap();
+    // Catalog has an approved event that won't match the scanned Next.js page
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    std::fs::write(
+        catalog_dir.join("catalog.yaml"),
+        minimal_catalog_yaml("evt_json0000000004", "some_other_event", "approved"),
+    )
+    .unwrap();
+    // Add Next.js page — scan will detect a new untracked event
+    let pages_dir = dir.path().join("pages");
+    std::fs::create_dir_all(&pages_dir).unwrap();
+    std::fs::write(
+        pages_dir.join("index.tsx"),
+        "export default function HomePage() { return null; }",
+    )
+    .unwrap();
+    let output = infergen()
+        .current_dir(dir.path())
+        .args(["check", "--json"])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = String::from_utf8_lossy(&output);
+    assert!(stdout.contains(r#""ok": false"#), "must be not ok");
+    assert!(stdout.contains(r#""new_untracked""#), "must list new_untracked");
+    // The scanned event has a name derived from the Next.js page
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("must be valid JSON");
+    let untracked = parsed["new_untracked"].as_array().expect("new_untracked must be array");
+    assert!(!untracked.is_empty(), "must have at least one new untracked event");
+    assert!(untracked[0].get("id").is_some(), "untracked event must have id");
+    assert!(untracked[0].get("name").is_some(), "untracked event must have name");
+}
+
 // ---------------------------------------------------------------------------
 // E3.3 Delivery Engine CLI tests
 // ---------------------------------------------------------------------------

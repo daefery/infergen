@@ -1,0 +1,48 @@
+# Infergen Analytics Check — CircleCI recipe
+#
+# Merge this snippet into your project's .circleci/config.yml.
+# Requires CircleCI config version 2.1.
+
+version: 2.1
+
+executors:
+  rust:
+    docker:
+      - image: cimg/rust:1.85
+    resource_class: medium
+
+jobs:
+  infergen-check:
+    executor: rust
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - infergen-v1-{{ checksum "Cargo.lock" }}
+            - infergen-v1-
+      - run:
+          name: Install infergen
+          command: |
+            if ! command -v infergen &>/dev/null; then
+              # Replace with `cargo install infergen` once published to crates.io.
+              cargo install --git https://github.com/daefery/infergen infergen
+            fi
+      - save_cache:
+          key: infergen-v1-{{ checksum "Cargo.lock" }}
+          paths:
+            - ~/.cargo/bin/infergen
+            - ~/.cargo/registry/
+      - run:
+          name: Infergen analytics check
+          command: infergen check --json | tee infergen-check.json
+      - store_artifacts:
+          path: infergen-check.json
+          destination: infergen-check.json
+
+workflows:
+  main:
+    jobs:
+      - infergen-check:
+          filters:
+            branches:
+              only: /.*/

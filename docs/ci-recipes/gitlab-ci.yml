@@ -1,0 +1,35 @@
+# Infergen Analytics Check — GitLab CI recipe
+#
+# Merge this snippet into your project's .gitlab-ci.yml.
+# jq must be available in the image (pre-installed in most CI images).
+
+infergen-check:
+  stage: test
+  image: rust:1.85
+  variables:
+    # Keep Cargo registry and built binaries across runs.
+    CARGO_HOME: "$CI_PROJECT_DIR/.cargo"
+  cache:
+    key: "infergen-cargo-$CI_COMMIT_REF_SLUG"
+    paths:
+      - .cargo/bin/
+      - .cargo/registry/
+  before_script:
+    # Install infergen only when the cached binary is absent.
+    - |
+      export PATH="$CARGO_HOME/bin:$PATH"
+      if [ ! -f "$CARGO_HOME/bin/infergen" ]; then
+        # Replace with `cargo install infergen` once published to crates.io.
+        cargo install --git https://github.com/daefery/infergen infergen
+      fi
+  script:
+    # Run check and write JSON output for potential downstream steps.
+    - infergen check --json | tee infergen-check.json
+  artifacts:
+    when: always
+    paths:
+      - infergen-check.json
+    expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

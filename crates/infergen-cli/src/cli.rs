@@ -69,6 +69,9 @@ pub struct CheckArgs {
     /// (or `.infergen/catalog.yaml` if no config file exists).
     #[arg(long)]
     pub catalog: Option<PathBuf>,
+    /// Output check result as JSON to stdout instead of human-readable text.
+    #[arg(long)]
+    pub json: bool,
 }
 
 /// Arguments for `infergen review`.
