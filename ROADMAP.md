@@ -27,7 +27,7 @@ Goal: turn raw detections into a reviewable, durable, convention-enforced tracki
 |---|---|---|---|---|
 | E1.1 | Event Catalog Schema & Store | Done | Define `catalog.yaml` schema: event name, trigger provenance, properties (name/type/required/PII), providers, status, confidence, stable ID. Read/write/serialize with stable, diff-friendly ordering. | Depends on E0.4. |
 | E1.2 | Heuristic Event Namer | Done | Derive event names + property candidates from identifiers (components, routes, handlers). Apply naming convention. Assign confidence scores. | Depends on E1.1. |
-| E1.3 | Naming Convention Engine & Linter | Planned | Configurable conventions (`entity.action.state`, snake_case, etc.). Lint catalog for violations; auto-suggest fixes. Ship sensible default. | Depends on E1.2. |
+| E1.3 | Naming Convention Engine & Linter | Done | Configurable conventions (`entity.action.state`, snake_case, etc.). Lint catalog for violations; auto-suggest fixes. Ship sensible default. | Depends on E1.2. |
 | E1.4 | Property Type Inference | Planned | Infer property types from AST context (function params, form fields, TS types). Flag likely PII (email, name, phone, address). | Depends on E0.3, E1.1. |
 | E1.5 | Review Workflow | Planned | Mark events `approved` / `ignored`; edit names/props inline. Diff view between scan result and existing catalog. | Depends on E1.1. |
 
