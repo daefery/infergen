@@ -19,6 +19,24 @@ pub fn run(args: GenerateArgs) -> anyhow::Result<()> {
     let config = CodegenConfig { include_proposed: args.include_proposed };
     let ts = generate_typescript(&catalog, &config);
 
+    if args.check {
+        let on_disk = if args.output.exists() {
+            std::fs::read_to_string(&args.output)
+                .with_context(|| format!("reading {}", args.output.display()))?
+        } else {
+            String::new()
+        };
+        if ts == on_disk {
+            println!("infergen: {} is up to date", args.output.display());
+            return Ok(());
+        } else {
+            anyhow::bail!(
+                "infergen: {} is stale — run `infergen generate` to regenerate",
+                args.output.display()
+            );
+        }
+    }
+
     let generated_count = catalog
         .events
         .iter()

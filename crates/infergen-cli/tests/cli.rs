@@ -202,6 +202,71 @@ fn generate_reports_event_count() {
         .stdout(contains("2 events"));
 }
 
+// ---------------------------------------------------------------------------
+// generate --check tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn generate_check_up_to_date_exits_zero() {
+    let dir = tempdir().unwrap();
+    let out = dir.path().join("sdk.ts");
+    infergen()
+        .current_dir(dir.path())
+        .args(["generate", "--output", out.to_str().unwrap()])
+        .assert()
+        .success();
+    infergen()
+        .current_dir(dir.path())
+        .args(["generate", "--output", out.to_str().unwrap(), "--check"])
+        .assert()
+        .success()
+        .stdout(contains("up to date"));
+}
+
+#[test]
+fn generate_check_missing_file_exits_nonzero() {
+    let dir = tempdir().unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .args(["generate", "--output", "sdk.ts", "--check"])
+        .assert()
+        .failure()
+        .stderr(contains("stale"));
+}
+
+#[test]
+fn generate_check_stale_file_exits_nonzero() {
+    let dir = tempdir().unwrap();
+    let out = dir.path().join("sdk.ts");
+    infergen()
+        .current_dir(dir.path())
+        .args(["generate", "--output", out.to_str().unwrap()])
+        .assert()
+        .success();
+    std::fs::write(&out, "// stale content\n").unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .args(["generate", "--output", out.to_str().unwrap(), "--check"])
+        .assert()
+        .failure()
+        .stderr(contains("stale"));
+}
+
+#[test]
+fn generate_check_does_not_write_file() {
+    let dir = tempdir().unwrap();
+    let out = dir.path().join("sdk.ts");
+    let sentinel = "// sentinel content\n";
+    std::fs::write(&out, sentinel).unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .args(["generate", "--output", out.to_str().unwrap(), "--check"])
+        .assert()
+        .failure();
+    let contents = std::fs::read_to_string(&out).unwrap();
+    assert_eq!(contents, sentinel, "--check must not overwrite the file");
+}
+
 /// Single-event YAML block for multi-event fixture building.
 fn minimal_event_yaml(id: &str, name: &str, status: &str) -> String {
     format!(
