@@ -5,7 +5,7 @@ pub mod generate;
 pub mod init;
 pub mod review;
 pub mod scan;
-pub mod stubs;
+pub mod watch;
 
 use crate::cli::Commands;
 
@@ -16,7 +16,7 @@ pub fn run(command: Commands) -> anyhow::Result<()> {
         Commands::Scan => scan::run(),
         Commands::Generate(args) => generate::run(args),
         Commands::Check(args) => check::run(args),
-        Commands::Watch => stubs::not_implemented("watch", "E4.3"),
+        Commands::Watch(args) => watch::run(args),
         Commands::Review(args) => review::run(args),
     }
 }

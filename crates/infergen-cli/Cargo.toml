@@ -15,6 +15,7 @@ path = "src/main.rs"
 infergen-core = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }
+notify = "6"
 
 [dev-dependencies]
 assert_cmd = "2.0"
