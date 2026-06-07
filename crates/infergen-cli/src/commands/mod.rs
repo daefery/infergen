@@ -3,6 +3,7 @@
 pub mod generate;
 pub mod init;
 pub mod review;
+pub mod schema;
 pub mod stubs;
 
 use crate::cli::Commands;
@@ -13,6 +14,7 @@ pub fn run(command: Commands) -> anyhow::Result<()> {
         Commands::Init(args) => init::run(args),
         Commands::Scan => stubs::not_implemented("scan", "E0.4"),
         Commands::Generate(args) => generate::run(args),
+        Commands::Schema(args) => schema::run(args),
         Commands::Check => stubs::not_implemented("check", "E4.2"),
         Commands::Watch => stubs::not_implemented("watch", "E4.3"),
         Commands::Review(args) => review::run(args),

@@ -18,6 +18,7 @@ pub mod parser;
 pub mod property;
 pub mod provider;
 pub mod review;
+pub mod schema;
 
 pub use adapter::nextjs::NextjsAdapter;
 pub use adapter::{Adapter, EventKind, PropertyHint, ProposedEvent};
@@ -38,6 +39,7 @@ pub use review::{
 };
 pub use parser::js::JsParser;
 pub use provider::{ProviderPlugin, ProviderRegistry, TrackEvent};
+pub use schema::{SqlDialect, generate_sql_schema};
 pub use parser::{Diagnostic, LanguageParser, ParsedFile};
 
 /// Version of the on-disk project config (`infergen.config.*`) schema.
