@@ -1,4 +1,4 @@
-//! `infergen check` — CI drift detection (E4.2).
+//! `infergen check` — CI drift detection (E4.2) with JSON output (E4.4).
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -11,8 +11,44 @@ use infergen_core::{
     lint_catalog,
     parser::LanguageParser,
 };
+use serde::Serialize;
 
 use crate::cli::CheckArgs;
+
+/// Machine-readable output of `infergen check --json`.
+#[derive(Debug, Serialize)]
+pub struct CheckReport {
+    /// `true` when catalog is clean; `false` when any issue was found.
+    pub ok: bool,
+    /// Total number of issues across all tiers.
+    pub issue_count: usize,
+    /// Tier 1: events detected in source but absent from the catalog.
+    pub new_untracked: Vec<EventRef>,
+    /// Tier 2: events in the catalog with `Proposed` status (not yet reviewed).
+    pub unreviewed: Vec<EventRef>,
+    /// Tier 3: naming convention violations in the existing catalog.
+    pub violations: Vec<ViolationRef>,
+}
+
+/// Minimal event reference: ID + name.
+#[derive(Debug, Serialize)]
+pub struct EventRef {
+    /// Stable event ID (e.g. `evt_0123456789abcdef`).
+    pub id: String,
+    /// Human-readable event name.
+    pub name: String,
+}
+
+/// A naming convention violation.
+#[derive(Debug, Serialize)]
+pub struct ViolationRef {
+    /// Name of the event that violated the convention.
+    pub event_name: String,
+    /// Human-readable description of the violation.
+    pub message: String,
+    /// Suggested replacement name, if one can be derived.
+    pub suggestion: Option<String>,
+}
 
 /// Walk `root` recursively and collect `.ts`, `.tsx`, `.js`, `.jsx` files.
 ///
@@ -105,6 +141,47 @@ pub fn run(args: CheckArgs) -> anyhow::Result<()> {
     let mut issue_count = 0;
 
     if !new_untracked.is_empty() {
+        issue_count += new_untracked.len();
+    }
+    if !unreviewed.is_empty() {
+        issue_count += unreviewed.len();
+    }
+    if !violations.is_empty() {
+        issue_count += violations.len();
+    }
+
+    // ── JSON output mode (E4.4) ─────────────────────────────────────────────
+    if args.json {
+        let report = CheckReport {
+            ok: issue_count == 0,
+            issue_count,
+            new_untracked: new_untracked
+                .iter()
+                .map(|e| EventRef { id: e.id.clone(), name: e.name.clone() })
+                .collect(),
+            unreviewed: unreviewed
+                .iter()
+                .map(|e| EventRef { id: e.id.clone(), name: e.name.clone() })
+                .collect(),
+            violations: violations
+                .iter()
+                .map(|v| ViolationRef {
+                    event_name: v.event_name.clone(),
+                    message: v.message.clone(),
+                    suggestion: v.suggestion.clone(),
+                })
+                .collect(),
+        };
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        if issue_count > 0 {
+            // Exit non-zero; JSON stdout is the authoritative error output.
+            anyhow::bail!("check failed: {} issue(s) — see JSON output above", issue_count);
+        }
+        return Ok(());
+    }
+
+    // ── Human-readable output mode ───────────────────────────────────────────
+    if !new_untracked.is_empty() {
         println!(
             "check: {} new untracked moment(s) — run `infergen scan` to record:",
             new_untracked.len()
@@ -112,7 +189,6 @@ pub fn run(args: CheckArgs) -> anyhow::Result<()> {
         for e in &new_untracked {
             println!("  + {} ({})", e.name, e.id);
         }
-        issue_count += new_untracked.len();
     }
 
     if !unreviewed.is_empty() {
@@ -123,7 +199,6 @@ pub fn run(args: CheckArgs) -> anyhow::Result<()> {
         for e in &unreviewed {
             println!("  ? {} ({})", e.name, e.id);
         }
-        issue_count += unreviewed.len();
     }
 
     if !violations.is_empty() {
@@ -135,7 +210,6 @@ pub fn run(args: CheckArgs) -> anyhow::Result<()> {
                 println!("  ! {}: {}", v.event_name, v.message);
             }
         }
-        issue_count += violations.len();
     }
 
     if issue_count > 0 {

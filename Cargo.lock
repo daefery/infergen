@@ -346,6 +346,8 @@ dependencies = [
  "infergen-core",
  "notify",
  "predicates",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 

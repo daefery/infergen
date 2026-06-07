@@ -1,0 +1,105 @@
+# Infergen Analytics Check — GitHub Actions recipe
+#
+# Copy this file to .github/workflows/infergen.yml in your project.
+#
+# Requirements:
+#   - infergen binary reachable (see "Install infergen" step below)
+#   - GITHUB_TOKEN secret (automatically provided by GitHub Actions)
+#
+# The workflow:
+#   1. Runs `infergen check` to detect untracked moments, unreviewed events,
+#      and naming convention violations.
+#   2. On pull requests: posts a formatted PR comment summarising the result.
+
+name: Infergen Analytics Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: infergen-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  infergen-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write   # required to post PR comments
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Install infergen ────────────────────────────────────────────────────
+      #
+      # Option A — binary installer (fastest; available once infergen publishes
+      # releases via cargo-dist):
+      #   curl -L https://github.com/daefery/infergen/releases/latest/download/infergen-installer.sh | sh
+      #
+      # Option B — install from Git (shown below; slower first run, then cached):
+      #
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: infergen-check
+
+      - name: Install infergen
+        # Replace with `cargo install infergen` once published to crates.io.
+        run: cargo install --git https://github.com/daefery/infergen infergen
+
+      # ── Run check ──────────────────────────────────────────────────────────
+      - name: Run infergen check
+        id: infergen
+        run: |
+          set +e
+          infergen check --json > infergen-check.json 2>&1
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          set -e
+        continue-on-error: true
+
+      # ── Post PR comment ─────────────────────────────────────────────────────
+      - name: Post PR comment
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          RESULT=$(cat infergen-check.json)
+          OK=$(echo "$RESULT" | jq -r '.ok')
+          ISSUE_COUNT=$(echo "$RESULT" | jq -r '.issue_count')
+
+          if [ "$OK" = "true" ]; then
+            COMMENT="## Infergen Analytics Check ✅\n\nCatalog is clean — no untracked moments, unreviewed events, or naming violations."
+          else
+            COMMENT="## Infergen Analytics Check ❌ — ${ISSUE_COUNT} issue(s) found\n"
+
+            NEW=$(echo "$RESULT" | jq -r '.new_untracked[] | "- \(.name) (`\(.id)`)"' 2>/dev/null || true)
+            UNREVIEWED=$(echo "$RESULT" | jq -r '.unreviewed[] | "- \(.name) (`\(.id)`)"' 2>/dev/null || true)
+            VIOLATIONS=$(echo "$RESULT" | jq -r '.violations[] | "- **\(.event_name)**: \(.message)\(if .suggestion != null then " → `\(.suggestion)`" else "" end)"' 2>/dev/null || true)
+
+            if [ -n "$NEW" ]; then
+              COMMENT="${COMMENT}\n\n### New untracked moments\nRun \`infergen scan\` then \`infergen review\` to record these:\n${NEW}"
+            fi
+            if [ -n "$UNREVIEWED" ]; then
+              COMMENT="${COMMENT}\n\n### Unreviewed events\nRun \`infergen review\` to approve or ignore:\n${UNREVIEWED}"
+            fi
+            if [ -n "$VIOLATIONS" ]; then
+              COMMENT="${COMMENT}\n\n### Naming convention violations\n${VIOLATIONS}"
+            fi
+          fi
+
+          printf '%b' "$COMMENT" | gh pr comment "$PR_NUMBER" --body-file -
+          # To update an existing comment instead of adding a new one, add: --edit-last
+
+      # ── Fail the job if check found issues ──────────────────────────────────
+      - name: Fail on check issues
+        if: steps.infergen.outputs.exit_code != '0'
+        run: |
+          echo "infergen check failed — see PR comment for details"
+          exit 1
