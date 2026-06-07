@@ -147,6 +147,115 @@ fn scan_rescan_keeps_approved_when_no_source_match() {
     assert!(after.contains("approved"), "status must remain approved");
 }
 
+// ── E4.3 watch integration tests ────────────────────────────────────────────
+
+#[test]
+fn watch_once_empty_dir_creates_catalog_and_sdk() {
+    let dir = tempdir().unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .args(["watch", "--once"])
+        .assert()
+        .success();
+    assert!(dir.path().join(".infergen/catalog.yaml").exists(), "catalog must be created");
+    assert!(dir.path().join("infergen.generated.ts").exists(), "SDK must be generated");
+}
+
+#[test]
+fn watch_once_nextjs_page_updates_catalog() {
+    let dir = tempdir().unwrap();
+    let pages_dir = dir.path().join("pages");
+    std::fs::create_dir_all(&pages_dir).unwrap();
+    std::fs::write(
+        pages_dir.join("index.tsx"),
+        "export default function HomePage() { return null; }",
+    )
+    .unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .args(["watch", "--once"])
+        .assert()
+        .success();
+    let catalog = std::fs::read_to_string(dir.path().join(".infergen/catalog.yaml")).unwrap();
+    assert!(catalog.contains("pageView"), "scan must detect page view event");
+}
+
+#[test]
+fn watch_once_generates_typescript_preamble() {
+    let dir = tempdir().unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .args(["watch", "--once"])
+        .assert()
+        .success();
+    let ts = std::fs::read_to_string(dir.path().join("infergen.generated.ts")).unwrap();
+    assert!(ts.contains("export interface Provider"), "SDK must have Provider interface");
+    assert!(ts.contains("configureInfergen"), "SDK must have configureInfergen");
+}
+
+#[test]
+fn watch_once_custom_output_path() {
+    let dir = tempdir().unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .args(["watch", "--once", "--output", "sdk/analytics.ts"])
+        .assert()
+        .success();
+    assert!(dir.path().join("sdk/analytics.ts").exists(), "SDK must be at custom path");
+}
+
+#[test]
+fn watch_once_prints_status_output() {
+    let dir = tempdir().unwrap();
+    let output = infergen()
+        .current_dir(dir.path())
+        .args(["watch", "--once"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stdout = String::from_utf8_lossy(&output);
+    assert!(stdout.contains("watch:"), "must print watch: prefix");
+    assert!(!stdout.contains("watching for changes"), "--once must not enter watch loop");
+}
+
+/// Live watch test: spawns the watcher, creates a file, verifies re-scan fires.
+/// Marked #[ignore] — uses real file watching and timing; run manually:
+/// `cargo test -p infergen-cli watch_live -- --ignored`
+#[test]
+#[ignore]
+fn watch_live_detects_new_source_file() {
+    use assert_cmd::cargo::cargo_bin;
+    use std::time::Duration;
+
+    let dir = tempdir().unwrap();
+    let mut child = std::process::Command::new(cargo_bin("infergen"))
+        .args(["watch"])
+        .current_dir(dir.path())
+        .spawn()
+        .unwrap();
+
+    // Allow initial scan to complete
+    std::thread::sleep(Duration::from_millis(800));
+
+    // Create a Next.js page — watcher should detect and re-scan
+    let pages_dir = dir.path().join("pages");
+    std::fs::create_dir_all(&pages_dir).unwrap();
+    std::fs::write(
+        pages_dir.join("about.tsx"),
+        "export default function AboutPage() { return null; }",
+    )
+    .unwrap();
+
+    // Wait for debounce (300ms) + re-scan time
+    std::thread::sleep(Duration::from_millis(2000));
+    child.kill().ok();
+
+    let catalog = std::fs::read_to_string(dir.path().join(".infergen/catalog.yaml")).unwrap();
+    assert!(catalog.contains("pageView"), "re-scan should detect about page event");
+}
+
 // ── E4.2 check integration tests ────────────────────────────────────────────
 
 #[test]

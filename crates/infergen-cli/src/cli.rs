@@ -28,8 +28,8 @@ pub enum Commands {
     Generate(GenerateArgs),
     /// CI check: fail on untracked moments, unreviewed events, or convention violations.
     Check(CheckArgs),
-    /// Watch files and re-scan on change. (Lands in E4.3.)
-    Watch,
+    /// Watch source files; re-scan and regenerate the SDK on change.
+    Watch(WatchArgs),
     /// Review and annotate the event catalog.
     Review(ReviewArgs),
 }
@@ -49,6 +49,17 @@ pub struct GenerateArgs {
     /// Check whether the output file is up to date; exit non-zero if stale. Does not write.
     #[arg(long)]
     pub check: bool,
+}
+
+/// Arguments for `infergen watch`.
+#[derive(Debug, Args)]
+pub struct WatchArgs {
+    /// Run one scan+generate cycle then exit (no file watching). Useful for debugging.
+    #[arg(long)]
+    pub once: bool,
+    /// Output TypeScript file path for the generated SDK.
+    #[arg(long, default_value = "infergen.generated.ts")]
+    pub output: PathBuf,
 }
 
 /// Arguments for `infergen check`.
