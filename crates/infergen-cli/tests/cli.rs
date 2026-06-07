@@ -267,6 +267,42 @@ fn generate_check_does_not_write_file() {
     assert_eq!(contents, sentinel, "--check must not overwrite the file");
 }
 
+// ---------------------------------------------------------------------------
+// generate with provider config tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn generate_with_posthog_config_emits_adapter() {
+    let dir = tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("infergen.config.json"),
+        r#"{"providers":[{"name":"posthog"}]}"#,
+    ).unwrap();
+    let out = dir.path().join("sdk.ts");
+    infergen()
+        .current_dir(dir.path())
+        .args(["generate", "--output", out.to_str().unwrap()])
+        .assert()
+        .success();
+    let ts = std::fs::read_to_string(&out).unwrap();
+    assert!(ts.contains("PostHogProvider"), "PostHogProvider not generated");
+    assert!(ts.contains("us.i.posthog.com"), "PostHog endpoint missing");
+}
+
+#[test]
+fn generate_without_config_no_adapter_section() {
+    let dir = tempdir().unwrap();
+    let out = dir.path().join("sdk.ts");
+    infergen()
+        .current_dir(dir.path())
+        .args(["generate", "--output", out.to_str().unwrap()])
+        .assert()
+        .success();
+    let ts = std::fs::read_to_string(&out).unwrap();
+    assert!(!ts.contains("PostHogProvider"), "unexpected adapter without config");
+    assert!(!ts.contains("Provider Adapters"), "unexpected adapter section without config");
+}
+
 /// Single-event YAML block for multi-event fixture building.
 fn minimal_event_yaml(id: &str, name: &str, status: &str) -> String {
     format!(

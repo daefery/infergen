@@ -7,6 +7,7 @@ use infergen_core::{
     Catalog, CatalogEntry, CatalogEventKind, CodegenConfig, EventProperty, EventProvenance,
     EventStatus, approve, generate_typescript,
 };
+use infergen_core::config::ProviderConfig;
 use infergen_types::CATALOG_SCHEMA_VERSION;
 
 // ---------------------------------------------------------------------------
@@ -37,6 +38,13 @@ fn make_entry(name: &str, status: EventStatus) -> CatalogEntry {
 
 fn make_prop(name: &str, t: Option<&str>, pii: bool) -> EventProperty {
     EventProperty { name: name.into(), prop_type: t.map(Into::into), required: false, pii }
+}
+
+fn make_config_with_providers(names: &[&str]) -> CodegenConfig {
+    CodegenConfig {
+        providers: names.iter().map(|n| ProviderConfig { name: n.to_string(), ..Default::default() }).collect(),
+        ..Default::default()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +112,7 @@ fn full_pipeline_unknown_type_for_untyped_prop() {
 #[test]
 fn full_pipeline_include_proposed_flag() {
     let cat = make_catalog(vec![make_entry("proposed_event", EventStatus::Proposed)]);
-    let config = CodegenConfig { include_proposed: true };
+    let config = CodegenConfig { include_proposed: true, ..Default::default() };
     let ts = generate_typescript(&cat, &config);
     assert!(ts.contains("proposed_event"), "proposed event missing with flag");
 }
@@ -184,16 +192,55 @@ fn full_pipeline_empty_catalog_has_preamble() {
 
 #[test]
 fn full_pipeline_approve_then_generate() {
-    // Simulate the user journey: scan → approve → generate
     let mut cat = make_catalog(vec![
         make_entry("page_viewed", EventStatus::Proposed),
         make_entry("user_signed_in", EventStatus::Proposed),
     ]);
-
-    // Approve only one event
     approve(&mut cat, "evt_page_viewed").unwrap();
-
     let ts = generate_typescript(&cat, &CodegenConfig::default());
     assert!(ts.contains("page_viewed"), "approved event missing");
     assert!(!ts.contains("user_signed_in"), "unapproved event present");
+}
+
+#[test]
+fn full_pipeline_posthog_adapter_generated() {
+    let cat = make_catalog(vec![make_entry("page_viewed", EventStatus::Approved)]);
+    let ts = generate_typescript(&cat, &make_config_with_providers(&["posthog"]));
+    assert!(ts.contains("PostHogProvider"), "PostHogProvider missing");
+    assert!(ts.contains("PostHogProviderOptions"), "options interface missing");
+    assert!(ts.contains("us.i.posthog.com"), "PostHog endpoint missing");
+}
+
+#[test]
+fn full_pipeline_no_providers_no_adapter_section() {
+    let cat = make_catalog(vec![make_entry("page_viewed", EventStatus::Approved)]);
+    let ts = generate_typescript(&cat, &CodegenConfig::default());
+    assert!(!ts.contains("PostHogProvider"), "unexpected PostHogProvider");
+    assert!(!ts.contains("Provider Adapters"), "unexpected adapter section header");
+}
+
+#[test]
+fn full_pipeline_all_seven_providers_generated() {
+    let cat = make_catalog(vec![make_entry("page_viewed", EventStatus::Approved)]);
+    let ts = generate_typescript(
+        &cat,
+        &make_config_with_providers(&[
+            "posthog", "segment", "amplitude", "mixpanel", "ga4", "rudderstack", "webhook",
+        ]),
+    );
+    assert!(ts.contains("PostHogProvider"), "posthog missing");
+    assert!(ts.contains("SegmentProvider"), "segment missing");
+    assert!(ts.contains("AmplitudeProvider"), "amplitude missing");
+    assert!(ts.contains("MixpanelProvider"), "mixpanel missing");
+    assert!(ts.contains("Ga4Provider"), "ga4 missing");
+    assert!(ts.contains("RudderStackProvider"), "rudderstack missing");
+    assert!(ts.contains("HttpWebhookProvider"), "webhook missing");
+}
+
+#[test]
+fn full_pipeline_unknown_provider_emits_comment() {
+    let cat = make_catalog(vec![make_entry("page_viewed", EventStatus::Approved)]);
+    let ts = generate_typescript(&cat, &make_config_with_providers(&["custom-thing"]));
+    assert!(ts.contains("custom-thing"), "provider name missing from comment");
+    assert!(ts.contains("unknown provider"), "comment text missing");
 }

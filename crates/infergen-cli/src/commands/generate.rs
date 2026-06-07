@@ -2,7 +2,7 @@
 
 use anyhow::Context;
 use infergen_core::{
-    Catalog, CodegenConfig, EventStatus, generate_typescript, load_catalog,
+    Catalog, CodegenConfig, Config, EventStatus, generate_typescript, load_catalog,
 };
 
 use crate::cli::GenerateArgs;
@@ -16,7 +16,15 @@ pub fn run(args: GenerateArgs) -> anyhow::Result<()> {
         Catalog::default()
     };
 
-    let config = CodegenConfig { include_proposed: args.include_proposed };
+    let project_config = std::env::current_dir()
+        .ok()
+        .and_then(|d| Config::load_from_dir(&d).ok())
+        .unwrap_or_default();
+
+    let config = CodegenConfig {
+        include_proposed: args.include_proposed,
+        providers: project_config.providers,
+    };
     let ts = generate_typescript(&catalog, &config);
 
     if args.check {
