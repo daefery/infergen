@@ -40,14 +40,111 @@ fn no_args_prints_banner() {
         .stdout(contains("config schema"));
 }
 
+// E4.1 — scan integration tests
+
 #[test]
-fn scan_stub_not_implemented() {
+fn scan_empty_dir_creates_catalog() {
+    let dir = tempdir().unwrap();
     infergen()
+        .current_dir(dir.path())
         .arg("scan")
         .assert()
         .success()
-        .stdout(contains("not yet implemented"))
-        .stdout(contains("E0.4"));
+        .stdout(contains("catalog saved"));
+    assert!(dir.path().join(".infergen/catalog.yaml").exists());
+}
+
+#[test]
+fn scan_nextjs_page_proposes_event() {
+    let dir = tempdir().unwrap();
+    let pages_dir = dir.path().join("pages");
+    std::fs::create_dir_all(&pages_dir).unwrap();
+    std::fs::write(
+        pages_dir.join("index.tsx"),
+        "export default function HomePage() { return null; }",
+    )
+    .unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .arg("scan")
+        .assert()
+        .success();
+    let catalog_path = dir.path().join(".infergen/catalog.yaml");
+    assert!(catalog_path.exists());
+    let contents = std::fs::read_to_string(&catalog_path).unwrap();
+    assert!(contents.contains("pageView"), "expected pageView kind in catalog");
+}
+
+#[test]
+fn scan_rescan_preserves_approved_event() {
+    let dir = tempdir().unwrap();
+    let pages_dir = dir.path().join("pages");
+    std::fs::create_dir_all(&pages_dir).unwrap();
+    std::fs::write(
+        pages_dir.join("index.tsx"),
+        "export default function HomePage() { return null; }",
+    )
+    .unwrap();
+    // First scan
+    infergen().current_dir(dir.path()).arg("scan").assert().success();
+
+    let catalog_path = dir.path().join(".infergen/catalog.yaml");
+    let yaml = std::fs::read_to_string(&catalog_path).unwrap();
+
+    // Extract event ID — serde_yaml may or may not quote the value
+    let id_start = yaml.find("evt_").unwrap_or_else(|| {
+        panic!("no evt_ id found in catalog:\n{yaml}")
+    });
+    let id_slice = &yaml[id_start..];
+    let id_end = id_slice.find(|c: char| c.is_whitespace() || c == '"').unwrap_or(id_slice.len());
+    let event_id = id_slice[..id_end].to_string();
+
+    // Approve the event
+    infergen()
+        .current_dir(dir.path())
+        .args(["review", "approve", &event_id])
+        .assert()
+        .success();
+
+    // Second scan — approved event must survive
+    infergen().current_dir(dir.path()).arg("scan").assert().success();
+    let after = std::fs::read_to_string(&catalog_path).unwrap();
+    assert!(after.contains("approved"), "approved event must survive rescan");
+    assert!(after.contains(&event_id), "approved event id must survive rescan");
+}
+
+#[test]
+fn scan_rescan_removes_stale_proposed_event() {
+    let dir = tempdir().unwrap();
+    // Seed catalog with a Proposed event that won't be re-detected
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    std::fs::write(
+        catalog_dir.join("catalog.yaml"),
+        minimal_catalog_yaml("evt_stale0000000000", "stale_event", "proposed"),
+    )
+    .unwrap();
+    // Scan empty dir — stale Proposed must be removed
+    infergen().current_dir(dir.path()).arg("scan").assert().success();
+    let after = std::fs::read_to_string(catalog_dir.join("catalog.yaml")).unwrap();
+    assert!(!after.contains("stale_event"), "stale Proposed event must be removed");
+}
+
+#[test]
+fn scan_rescan_keeps_approved_when_no_source_match() {
+    let dir = tempdir().unwrap();
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    std::fs::write(
+        catalog_dir.join("catalog.yaml"),
+        minimal_catalog_yaml("evt_kept0000000000", "important_event", "approved"),
+    )
+    .unwrap();
+    // Scan empty dir — Approved event must be kept
+    infergen().current_dir(dir.path()).arg("scan").assert().success();
+    let after = std::fs::read_to_string(catalog_dir.join("catalog.yaml")).unwrap();
+    assert!(after.contains("important_event"), "approved event must survive");
+    assert!(after.contains("approved"), "status must remain approved");
 }
 
 #[test]

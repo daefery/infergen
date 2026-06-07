@@ -7,9 +7,10 @@ use infergen_core::{
     JsParser,
     NextjsAdapter,
     adapter::{Adapter, EventKind, PropertyHint, ProposedEvent},
-    catalog::{from_proposals, load_catalog, merge_proposals, save_catalog},
+    catalog::{from_proposals, load_catalog, merge_proposals, rescan_merge, save_catalog},
     parser::LanguageParser,
 };
+use infergen_types::{CatalogEntry, EventProvenance};
 use tempfile::tempdir;
 
 fn make_proposal(name: &str, kind: EventKind, abs_path: &str, confidence: f32) -> ProposedEvent {
@@ -328,4 +329,207 @@ fn nextjs_adapter_proposals_convert_to_catalog() {
             );
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// rescan_merge integration tests
+// ---------------------------------------------------------------------------
+
+fn make_catalog_entry(id: &str, name: &str, status: EventStatus) -> CatalogEntry {
+    CatalogEntry {
+        id: id.to_owned(),
+        name: name.to_owned(),
+        description: String::new(),
+        status,
+        confidence: 0.9,
+        kind: CatalogEventKind::PageView,
+        provenance: vec![EventProvenance {
+            source_path: "src/index.tsx".into(),
+            line: None,
+            adapter: String::new(),
+        }],
+        properties: Vec::new(),
+        providers: Vec::new(),
+    }
+}
+
+fn make_catalog(entries: Vec<CatalogEntry>) -> Catalog {
+    use infergen_types::CATALOG_SCHEMA_VERSION;
+    Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: entries }
+}
+
+#[test]
+fn rescan_merge_empty_existing_and_proposals() {
+    let existing = make_catalog(vec![]);
+    let result = rescan_merge(&existing, &[], std::path::Path::new("/root"));
+    assert!(result.events.is_empty());
+}
+
+#[test]
+fn rescan_merge_fresh_scan_all_proposed() {
+    let existing = make_catalog(vec![]);
+    let proposals = vec![
+        make_proposal("page_viewed", EventKind::PageView, "/root/pages/index.tsx", 0.9),
+        make_proposal("form_submitted", EventKind::FormSubmit, "/root/form.tsx", 0.7),
+    ];
+    let result = rescan_merge(&existing, &proposals, std::path::Path::new("/root"));
+    assert_eq!(result.events.len(), 2);
+    for e in &result.events {
+        assert_eq!(e.status, EventStatus::Proposed, "fresh scan should be Proposed");
+    }
+}
+
+#[test]
+fn rescan_merge_preserved_name_edit() {
+    let proposals = vec![make_proposal("page_viewed", EventKind::PageView, "/root/a.tsx", 0.9)];
+    let fresh = from_proposals(&proposals, std::path::Path::new("/root"));
+    let mut renamed = fresh.events[0].clone();
+    renamed.name = "my_custom_view".to_string();
+    let existing = make_catalog(vec![renamed]);
+
+    let result = rescan_merge(&existing, &proposals, std::path::Path::new("/root"));
+    assert_eq!(result.events[0].name, "my_custom_view");
+}
+
+#[test]
+fn rescan_merge_preserved_approved_status() {
+    let proposals = vec![make_proposal("page_viewed", EventKind::PageView, "/root/a.tsx", 0.9)];
+    let fresh = from_proposals(&proposals, std::path::Path::new("/root"));
+    let mut approved = fresh.events[0].clone();
+    approved.status = EventStatus::Approved;
+    let existing = make_catalog(vec![approved]);
+
+    let result = rescan_merge(&existing, &proposals, std::path::Path::new("/root"));
+    assert_eq!(result.events[0].status, EventStatus::Approved);
+}
+
+#[test]
+fn rescan_merge_preserved_ignored_status() {
+    let proposals = vec![make_proposal("page_viewed", EventKind::PageView, "/root/a.tsx", 0.9)];
+    let fresh = from_proposals(&proposals, std::path::Path::new("/root"));
+    let mut ignored = fresh.events[0].clone();
+    ignored.status = EventStatus::Ignored;
+    let existing = make_catalog(vec![ignored]);
+
+    let result = rescan_merge(&existing, &proposals, std::path::Path::new("/root"));
+    assert_eq!(result.events[0].status, EventStatus::Ignored);
+}
+
+#[test]
+fn rescan_merge_preserved_description() {
+    let proposals = vec![make_proposal("page_viewed", EventKind::PageView, "/root/a.tsx", 0.9)];
+    let fresh = from_proposals(&proposals, std::path::Path::new("/root"));
+    let mut desc = fresh.events[0].clone();
+    desc.description = "User-written description.".to_string();
+    let existing = make_catalog(vec![desc]);
+
+    let result = rescan_merge(&existing, &proposals, std::path::Path::new("/root"));
+    assert_eq!(result.events[0].description, "User-written description.");
+}
+
+#[test]
+fn rescan_merge_preserved_properties() {
+    use infergen_types::EventProperty;
+    let proposals = vec![make_proposal("page_viewed", EventKind::PageView, "/root/a.tsx", 0.9)];
+    let fresh = from_proposals(&proposals, std::path::Path::new("/root"));
+    let mut with_prop = fresh.events[0].clone();
+    with_prop.properties.push(EventProperty {
+        name: "human_prop".into(),
+        prop_type: Some("boolean".into()),
+        required: true,
+        pii: false,
+    });
+    let existing = make_catalog(vec![with_prop]);
+
+    let result = rescan_merge(&existing, &proposals, std::path::Path::new("/root"));
+    assert_eq!(result.events[0].properties.len(), 1);
+    assert_eq!(result.events[0].properties[0].name, "human_prop");
+}
+
+#[test]
+fn rescan_merge_drops_stale_proposed() {
+    let existing = make_catalog(vec![
+        make_catalog_entry("evt_stale0000000001", "stale_event", EventStatus::Proposed),
+    ]);
+    let result = rescan_merge(&existing, &[], std::path::Path::new("/root"));
+    assert!(result.events.is_empty(), "stale Proposed must be removed");
+}
+
+#[test]
+fn rescan_merge_keeps_approved_on_disappear() {
+    let existing = make_catalog(vec![
+        make_catalog_entry("evt_approved000001", "important_event", EventStatus::Approved),
+    ]);
+    let result = rescan_merge(&existing, &[], std::path::Path::new("/root"));
+    assert_eq!(result.events.len(), 1);
+    assert_eq!(result.events[0].name, "important_event");
+}
+
+#[test]
+fn rescan_merge_keeps_ignored_on_disappear() {
+    let existing = make_catalog(vec![
+        make_catalog_entry("evt_ignored0000001", "noise_event", EventStatus::Ignored),
+    ]);
+    let result = rescan_merge(&existing, &[], std::path::Path::new("/root"));
+    assert_eq!(result.events.len(), 1);
+    assert_eq!(result.events[0].status, EventStatus::Ignored);
+}
+
+#[test]
+fn rescan_merge_adds_new_detection() {
+    let existing = make_catalog(vec![]);
+    let proposals = vec![make_proposal("brand_new_event", EventKind::ApiCall, "/root/api.ts", 0.8)];
+    let result = rescan_merge(&existing, &proposals, std::path::Path::new("/root"));
+    assert_eq!(result.events.len(), 1);
+    assert_eq!(result.events[0].name, "brand_new_event");
+    assert_eq!(result.events[0].status, EventStatus::Proposed);
+}
+
+#[test]
+fn rescan_merge_sorted_output() {
+    let existing = make_catalog(vec![]);
+    let proposals = vec![
+        make_proposal("zzz_event", EventKind::PageView, "/root/c.tsx", 0.9),
+        make_proposal("aaa_event", EventKind::ApiCall, "/root/a.ts", 0.9),
+    ];
+    let result = rescan_merge(&existing, &proposals, std::path::Path::new("/root"));
+    let ids: Vec<&str> = result.events.iter().map(|e| e.id.as_str()).collect();
+    let mut sorted = ids.clone();
+    sorted.sort_unstable();
+    assert_eq!(ids, sorted, "rescan_merge must return events sorted by id");
+}
+
+#[test]
+fn rescan_merge_full_scenario() {
+    // Three existing events, various statuses
+    let initial_proposals = vec![
+        make_proposal("matched_event", EventKind::PageView, "/root/a.tsx", 0.9),
+        make_proposal("stale_proposed", EventKind::ApiCall, "/root/b.ts", 0.8),
+        make_proposal("gone_approved", EventKind::AuthEvent, "/root/c.ts", 0.85),
+    ];
+    let first = from_proposals(&initial_proposals, std::path::Path::new("/root"));
+
+    // Approve one event
+    let mut existing = first.clone();
+    for e in &mut existing.events {
+        if e.name == "gone_approved" {
+            e.status = EventStatus::Approved;
+        }
+    }
+
+    // Second scan: matched_event reappears, stale/approved are gone, new_event appears
+    let second_proposals = vec![
+        make_proposal("matched_event", EventKind::PageView, "/root/a.tsx", 0.9),
+        make_proposal("brand_new", EventKind::FormSubmit, "/root/d.tsx", 0.7),
+    ];
+    let result = rescan_merge(&existing, &second_proposals, std::path::Path::new("/root"));
+
+    assert!(result.events.iter().any(|e| e.name == "matched_event"), "matched must survive");
+    assert!(!result.events.iter().any(|e| e.name == "stale_proposed"), "stale Proposed must be dropped");
+    assert!(result.events.iter().any(|e| e.name == "gone_approved"), "Approved must be kept");
+    assert!(result.events.iter().any(|e| e.name == "brand_new"), "new event must be added");
+    assert_eq!(
+        result.events.iter().find(|e| e.name == "brand_new").unwrap().status,
+        EventStatus::Proposed
+    );
 }

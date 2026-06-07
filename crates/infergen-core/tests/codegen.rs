@@ -170,7 +170,7 @@ fn full_pipeline_track_fn_dispatches_via_providers() {
     let cat = make_catalog(vec![make_entry("page_viewed", EventStatus::Approved)]);
     let ts = generate_typescript(&cat, &CodegenConfig::default());
     assert!(
-        ts.contains("_providers.forEach(p => p.track(\"page_viewed\", properties))"),
+        ts.contains("_dispatch(\"page_viewed\", properties)"),
         "dispatch call missing\noutput:\n{ts}"
     );
 }

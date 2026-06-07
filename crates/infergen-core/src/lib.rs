@@ -21,7 +21,7 @@ pub mod review;
 
 pub use adapter::nextjs::NextjsAdapter;
 pub use adapter::{Adapter, EventKind, PropertyHint, ProposedEvent};
-pub use catalog::{from_proposals, load_catalog, merge_proposals, save_catalog};
+pub use catalog::{from_proposals, load_catalog, merge_proposals, rescan_merge, save_catalog};
 pub use codegen::{CodegenConfig, generate_typescript};
 pub use config::Config;
 pub use detect::{DetectionResult, Framework, Language, detect};
