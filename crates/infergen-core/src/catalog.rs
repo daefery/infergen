@@ -183,6 +183,62 @@ pub fn save_catalog(catalog: &Catalog, path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Merge fresh scan proposals into an existing catalog using three-way merge semantics.
+///
+/// ## Merge rules (keyed on stable ID)
+///
+/// | Scenario | Action |
+/// |---|---|
+/// | ID in proposals only (new detection) | Add as `Proposed` |
+/// | ID in both existing and proposed | Keep existing entry verbatim (all human edits preserved) |
+/// | ID in existing only, status `Proposed` | Remove — unreviewed event no longer detected |
+/// | ID in existing only, status `Approved` or `Ignored` | Keep — human reviewed |
+///
+/// The returned [`Catalog`] is sorted by ID for stable diffs.
+#[must_use]
+pub fn rescan_merge(
+    existing: &Catalog,
+    proposals: &[ProposedEvent],
+    project_root: &Path,
+) -> Catalog {
+    let proposed_catalog = from_proposals(proposals, project_root);
+
+    let existing_ids: HashSet<&str> = existing.events.iter().map(|e| e.id.as_str()).collect();
+    let proposed_ids: HashSet<&str> =
+        proposed_catalog.events.iter().map(|e| e.id.as_str()).collect();
+
+    let mut merged: Vec<CatalogEntry> = Vec::new();
+
+    // Keep existing entries that match or are reviewed
+    for entry in &existing.events {
+        if proposed_ids.contains(entry.id.as_str()) {
+            // Matched — keep existing verbatim (preserve all human edits)
+            merged.push(entry.clone());
+        } else {
+            // Disappeared from scan
+            match entry.status {
+                EventStatus::Proposed => {} // drop — unreviewed, no longer detected
+                EventStatus::Approved | EventStatus::Ignored => {
+                    merged.push(entry.clone()); // keep — human explicitly reviewed
+                }
+            }
+        }
+    }
+
+    // Add new proposals (IDs absent from existing)
+    for entry in proposed_catalog.events {
+        if !existing_ids.contains(entry.id.as_str()) {
+            merged.push(entry);
+        }
+    }
+
+    merged.sort_by(|a, b| a.id.cmp(&b.id));
+
+    Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: merged }
+}
+
+// ---------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -346,5 +402,227 @@ mod tests {
         let mut sorted = ids.clone();
         sorted.sort_unstable();
         assert_eq!(ids, sorted, "events must be sorted by id");
+    }
+
+    // ---------------------------------------------------------------------------
+    // rescan_merge tests
+    // ---------------------------------------------------------------------------
+
+    fn make_entry_with_id(id: &str, name: &str, status: EventStatus) -> CatalogEntry {
+        use infergen_types::{CatalogEventKind, EventProvenance};
+        CatalogEntry {
+            id: id.to_owned(),
+            name: name.to_owned(),
+            description: String::new(),
+            status,
+            confidence: 0.9,
+            kind: CatalogEventKind::PageView,
+            provenance: vec![EventProvenance {
+                source_path: "src/index.tsx".into(),
+                line: None,
+                adapter: String::new(),
+            }],
+            properties: Vec::new(),
+            providers: Vec::new(),
+        }
+    }
+
+    fn make_catalog_with(entries: Vec<CatalogEntry>) -> Catalog {
+        Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: entries }
+    }
+
+    #[test]
+    fn rescan_merge_empty_both_returns_empty() {
+        let existing = make_catalog_with(vec![]);
+        let result = rescan_merge(&existing, &[], Path::new("/root"));
+        assert!(result.events.is_empty());
+    }
+
+    #[test]
+    fn rescan_merge_empty_existing_adds_all_as_proposed() {
+        let existing = make_catalog_with(vec![]);
+        let proposals = vec![
+            make_proposal("page_viewed", EventKind::PageView, "/root/index.tsx", 0.9),
+        ];
+        let result = rescan_merge(&existing, &proposals, Path::new("/root"));
+        assert_eq!(result.events.len(), 1);
+        assert_eq!(result.events[0].status, EventStatus::Proposed);
+    }
+
+    #[test]
+    fn rescan_merge_matched_id_preserves_name() {
+        let proposals = vec![
+            make_proposal("page_viewed", EventKind::PageView, "/root/index.tsx", 0.9),
+        ];
+        // Build catalog to get the stable ID
+        let fresh = from_proposals(&proposals, Path::new("/root"));
+        let id = fresh.events[0].id.clone();
+
+        // Human renamed it
+        let mut renamed = fresh.events[0].clone();
+        renamed.name = "custom_page_view".to_string();
+        let existing = make_catalog_with(vec![renamed]);
+
+        let result = rescan_merge(&existing, &proposals, Path::new("/root"));
+        assert_eq!(result.events.len(), 1);
+        assert_eq!(result.events[0].name, "custom_page_view");
+        assert_eq!(result.events[0].id, id);
+    }
+
+    #[test]
+    fn rescan_merge_matched_id_preserves_approved_status() {
+        let proposals = vec![
+            make_proposal("page_viewed", EventKind::PageView, "/root/index.tsx", 0.9),
+        ];
+        let fresh = from_proposals(&proposals, Path::new("/root"));
+        let mut approved = fresh.events[0].clone();
+        approved.status = EventStatus::Approved;
+        let existing = make_catalog_with(vec![approved]);
+
+        let result = rescan_merge(&existing, &proposals, Path::new("/root"));
+        assert_eq!(result.events[0].status, EventStatus::Approved);
+    }
+
+    #[test]
+    fn rescan_merge_matched_id_preserves_ignored_status() {
+        let proposals = vec![
+            make_proposal("page_viewed", EventKind::PageView, "/root/index.tsx", 0.9),
+        ];
+        let fresh = from_proposals(&proposals, Path::new("/root"));
+        let mut ignored = fresh.events[0].clone();
+        ignored.status = EventStatus::Ignored;
+        let existing = make_catalog_with(vec![ignored]);
+
+        let result = rescan_merge(&existing, &proposals, Path::new("/root"));
+        assert_eq!(result.events[0].status, EventStatus::Ignored);
+    }
+
+    #[test]
+    fn rescan_merge_matched_id_preserves_description() {
+        let proposals = vec![
+            make_proposal("page_viewed", EventKind::PageView, "/root/index.tsx", 0.9),
+        ];
+        let fresh = from_proposals(&proposals, Path::new("/root"));
+        let mut described = fresh.events[0].clone();
+        described.description = "Human description.".to_string();
+        let existing = make_catalog_with(vec![described]);
+
+        let result = rescan_merge(&existing, &proposals, Path::new("/root"));
+        assert_eq!(result.events[0].description, "Human description.");
+    }
+
+    #[test]
+    fn rescan_merge_matched_id_preserves_properties() {
+        use infergen_types::EventProperty;
+        let proposals = vec![
+            make_proposal("page_viewed", EventKind::PageView, "/root/index.tsx", 0.9),
+        ];
+        let fresh = from_proposals(&proposals, Path::new("/root"));
+        let mut with_prop = fresh.events[0].clone();
+        with_prop.properties.push(EventProperty {
+            name: "custom_prop".into(),
+            prop_type: Some("string".into()),
+            required: true,
+            pii: false,
+        });
+        let existing = make_catalog_with(vec![with_prop]);
+
+        let result = rescan_merge(&existing, &proposals, Path::new("/root"));
+        assert_eq!(result.events[0].properties.len(), 1);
+        assert_eq!(result.events[0].properties[0].name, "custom_prop");
+    }
+
+    #[test]
+    fn rescan_merge_disappeared_proposed_is_removed() {
+        // Existing has a Proposed event that is NOT in new proposals
+        let existing = make_catalog_with(vec![
+            make_entry_with_id("evt_stale0000000000", "stale_event", EventStatus::Proposed),
+        ]);
+        // No proposals → stale Proposed should be removed
+        let result = rescan_merge(&existing, &[], Path::new("/root"));
+        assert!(result.events.is_empty(), "stale Proposed event must be removed");
+    }
+
+    #[test]
+    fn rescan_merge_disappeared_approved_is_kept() {
+        let existing = make_catalog_with(vec![
+            make_entry_with_id("evt_approved000000", "important_event", EventStatus::Approved),
+        ]);
+        let result = rescan_merge(&existing, &[], Path::new("/root"));
+        assert_eq!(result.events.len(), 1, "Approved event must survive rescan");
+        assert_eq!(result.events[0].name, "important_event");
+    }
+
+    #[test]
+    fn rescan_merge_disappeared_ignored_is_kept() {
+        let existing = make_catalog_with(vec![
+            make_entry_with_id("evt_ignored0000000", "noise_event", EventStatus::Ignored),
+        ]);
+        let result = rescan_merge(&existing, &[], Path::new("/root"));
+        assert_eq!(result.events.len(), 1, "Ignored event must survive rescan");
+    }
+
+    #[test]
+    fn rescan_merge_new_proposal_added() {
+        let existing = make_catalog_with(vec![]);
+        let proposals = vec![
+            make_proposal("new_event", EventKind::ApiCall, "/root/api.ts", 0.8),
+        ];
+        let result = rescan_merge(&existing, &proposals, Path::new("/root"));
+        assert_eq!(result.events.len(), 1);
+        assert_eq!(result.events[0].name, "new_event");
+        assert_eq!(result.events[0].status, EventStatus::Proposed);
+    }
+
+    #[test]
+    fn rescan_merge_result_sorted_by_id() {
+        let existing = make_catalog_with(vec![]);
+        let proposals = vec![
+            make_proposal("zzz", EventKind::PageView, "/root/c.tsx", 0.9),
+            make_proposal("aaa", EventKind::ApiCall, "/root/a.ts", 0.9),
+            make_proposal("mmm", EventKind::FormSubmit, "/root/b.tsx", 0.9),
+        ];
+        let result = rescan_merge(&existing, &proposals, Path::new("/root"));
+        let ids: Vec<&str> = result.events.iter().map(|e| e.id.as_str()).collect();
+        let mut sorted = ids.clone();
+        sorted.sort_unstable();
+        assert_eq!(ids, sorted, "rescan_merge output must be sorted by id");
+    }
+
+    #[test]
+    fn rescan_merge_combination_all_three_scenarios() {
+        let proposals_first = vec![
+            make_proposal("matched_event", EventKind::PageView, "/root/a.tsx", 0.9),
+            make_proposal("will_disappear_proposed", EventKind::ApiCall, "/root/b.ts", 0.8),
+            make_proposal("will_disappear_approved", EventKind::AuthEvent, "/root/c.ts", 0.85),
+        ];
+        let first_catalog = from_proposals(&proposals_first, Path::new("/root"));
+
+        // Set up existing catalog with various statuses
+        let mut existing = first_catalog.clone();
+        // will_disappear_approved → Approved
+        for e in &mut existing.events {
+            if e.name == "will_disappear_approved" {
+                e.status = EventStatus::Approved;
+            }
+        }
+
+        // Second scan: matched_event still present, will_disappear_* gone, new_event added
+        let proposals_second = vec![
+            make_proposal("matched_event", EventKind::PageView, "/root/a.tsx", 0.9),
+            make_proposal("new_event", EventKind::FormSubmit, "/root/d.tsx", 0.7),
+        ];
+
+        let result = rescan_merge(&existing, &proposals_second, Path::new("/root"));
+
+        // matched_event: present in result
+        assert!(result.events.iter().any(|e| e.name == "matched_event"), "matched_event must be kept");
+        // will_disappear_proposed: removed (was Proposed, not in scan)
+        assert!(!result.events.iter().any(|e| e.name == "will_disappear_proposed"), "stale Proposed must be removed");
+        // will_disappear_approved: kept (was Approved)
+        assert!(result.events.iter().any(|e| e.name == "will_disappear_approved"), "Approved must be kept");
+        // new_event: added
+        assert!(result.events.iter().any(|e| e.name == "new_event"), "new_event must be added");
+        assert_eq!(result.events.iter().filter(|e| e.name == "new_event").next().unwrap().status, EventStatus::Proposed);
     }
 }
