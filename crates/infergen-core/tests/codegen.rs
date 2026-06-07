@@ -197,3 +197,71 @@ fn full_pipeline_approve_then_generate() {
     assert!(ts.contains("page_viewed"), "approved event missing");
     assert!(!ts.contains("user_signed_in"), "unapproved event present");
 }
+
+// ---------------------------------------------------------------------------
+// E3.3 Delivery Engine integration tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn full_pipeline_has_delivery_engine_class() {
+    let cat = make_catalog(vec![make_entry("page_viewed", EventStatus::Approved)]);
+    let ts = generate_typescript(&cat, &CodegenConfig::default());
+    assert!(ts.contains("DeliveryEngine"), "DeliveryEngine class missing");
+}
+
+#[test]
+fn full_pipeline_has_delivery_options_interface() {
+    let cat = make_catalog(vec![make_entry("page_viewed", EventStatus::Approved)]);
+    let ts = generate_typescript(&cat, &CodegenConfig::default());
+    assert!(ts.contains("DeliveryOptions"), "DeliveryOptions interface missing");
+}
+
+#[test]
+fn full_pipeline_has_with_delivery_fn() {
+    let cat = make_catalog(vec![make_entry("page_viewed", EventStatus::Approved)]);
+    let ts = generate_typescript(&cat, &CodegenConfig::default());
+    assert!(ts.contains("withDelivery"), "withDelivery function missing");
+}
+
+#[test]
+fn full_pipeline_delivery_engine_implements_provider() {
+    let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+    assert!(ts.contains("implements Provider"), "implements Provider missing");
+}
+
+#[test]
+fn full_pipeline_delivery_engine_batching_present() {
+    let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+    assert!(ts.contains("batchSize"), "batchSize missing");
+}
+
+#[test]
+fn full_pipeline_delivery_engine_retry_present() {
+    let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+    assert!(ts.contains("maxRetries"), "maxRetries missing");
+}
+
+#[test]
+fn full_pipeline_delivery_engine_sampling_present() {
+    let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+    assert!(ts.contains("sampleRate"), "sampleRate missing");
+}
+
+#[test]
+fn full_pipeline_delivery_engine_exit_hook_present() {
+    let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+    assert!(ts.contains("beforeExit"), "beforeExit hook missing");
+}
+
+#[test]
+fn full_pipeline_delivery_engine_persistence_present() {
+    let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+    assert!(ts.contains("persistenceKey"), "persistenceKey missing");
+}
+
+#[test]
+fn full_pipeline_delivery_engine_on_empty_catalog() {
+    let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+    assert!(ts.contains("DeliveryEngine"), "DeliveryEngine missing on empty catalog");
+    assert!(ts.contains("withDelivery"), "withDelivery missing on empty catalog");
+}
