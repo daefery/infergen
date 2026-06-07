@@ -16,6 +16,7 @@ pub mod linter;
 pub mod namer;
 pub mod parser;
 pub mod property;
+pub mod provider;
 pub mod review;
 
 pub use adapter::nextjs::NextjsAdapter;
@@ -36,6 +37,7 @@ pub use review::{
     set_description, upsert_property,
 };
 pub use parser::js::JsParser;
+pub use provider::{ProviderPlugin, ProviderRegistry, TrackEvent};
 pub use parser::{Diagnostic, LanguageParser, ParsedFile};
 
 /// Version of the on-disk project config (`infergen.config.*`) schema.
@@ -113,6 +115,15 @@ pub enum Error {
         /// Human-readable reason.
         reason: String,
     },
+
+    /// A provider plugin returned an error during a tracking call.
+    #[error("provider {id:?} failed: {message}")]
+    ProviderError {
+        /// The offending provider's ID.
+        id: String,
+        /// Human-readable error from the provider.
+        message: String,
+    },
 }
 
 /// Convenience result type for scan-engine fallible operations.
@@ -177,5 +188,12 @@ mod tests {
     fn invalid_event_name_error_formats() {
         let e = Error::InvalidEventName { name: "".into(), reason: "empty".into() };
         assert!(e.to_string().contains("empty"));
+    }
+
+    #[test]
+    fn provider_error_formats() {
+        let e = Error::ProviderError { id: "posthog".into(), message: "timeout".into() };
+        assert!(e.to_string().contains("posthog"));
+        assert!(e.to_string().contains("timeout"));
     }
 }

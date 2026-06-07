@@ -157,6 +157,32 @@ fn full_pipeline_properties_sorted_alphabetically() {
 }
 
 #[test]
+fn full_pipeline_has_provider_interface() {
+    let cat = make_catalog(vec![make_entry("page_viewed", EventStatus::Approved)]);
+    let ts = generate_typescript(&cat, &CodegenConfig::default());
+    assert!(ts.contains("export interface Provider"), "Provider interface missing");
+    assert!(ts.contains("export function configureInfergen"), "configureInfergen missing");
+    assert!(ts.contains("let _providers: Provider[] = []"), "_providers missing");
+}
+
+#[test]
+fn full_pipeline_track_fn_dispatches_via_providers() {
+    let cat = make_catalog(vec![make_entry("page_viewed", EventStatus::Approved)]);
+    let ts = generate_typescript(&cat, &CodegenConfig::default());
+    assert!(
+        ts.contains("_providers.forEach(p => p.track(\"page_viewed\", properties))"),
+        "dispatch call missing\noutput:\n{ts}"
+    );
+}
+
+#[test]
+fn full_pipeline_empty_catalog_has_preamble() {
+    let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+    assert!(ts.contains("export interface Provider"), "preamble missing for empty catalog");
+    assert!(ts.contains("configureInfergen"), "configureInfergen missing for empty catalog");
+}
+
+#[test]
 fn full_pipeline_approve_then_generate() {
     // Simulate the user journey: scan → approve → generate
     let mut cat = make_catalog(vec![

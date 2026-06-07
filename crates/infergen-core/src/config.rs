@@ -78,12 +78,17 @@ pub struct NamingConfig {
     pub case: String,
 }
 
-/// A configured destination/provider entry. Shape firms up in M3 (E3.1).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// A configured destination/provider entry.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderConfig {
-    /// Provider identifier, e.g. `posthog`, `segment`, `file`.
+    /// Provider identifier, e.g. `"posthog"`, `"segment"`, `"file"`.
     pub name: String,
+    /// Provider-specific key-value options (API keys, endpoints, etc.).
+    ///
+    /// Empty for providers that need no configuration (e.g. `"console"`).
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub config: std::collections::HashMap<String, String>,
 }
 
 fn default_schema_version() -> u32 {
@@ -253,6 +258,7 @@ mod tests {
         c.frameworks.push(Framework::NextJs);
         c.providers.push(ProviderConfig {
             name: "posthog".to_string(),
+            ..Default::default()
         });
         c.save(&path).unwrap();
         let loaded = Config::load(&path).unwrap();
@@ -295,5 +301,28 @@ mod tests {
         let s = serde_json::to_string_pretty(&Config::default()).unwrap();
         assert!(s.contains("schemaVersion"));
         assert!(!s.contains("schema_version"));
+    }
+
+    #[test]
+    fn provider_config_with_options_json_round_trip() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("infergen.config.json");
+        let mut c = Config::default();
+        let mut opts = std::collections::HashMap::new();
+        opts.insert("apiKey".to_string(), "ph-secret".to_string());
+        opts.insert("host".to_string(), "https://eu.posthog.com".to_string());
+        c.providers.push(ProviderConfig { name: "posthog".to_string(), config: opts });
+        c.save(&path).unwrap();
+        let loaded = Config::load(&path).unwrap();
+        assert_eq!(loaded, c);
+        let s = std::fs::read_to_string(&path).unwrap();
+        assert!(s.contains("ph-secret"), "apiKey missing from serialized config");
+    }
+
+    #[test]
+    fn provider_config_empty_options_omitted_from_json() {
+        let c = ProviderConfig { name: "console".to_string(), ..Default::default() };
+        let s = serde_json::to_string(&c).unwrap();
+        assert!(!s.contains("config"), "empty config map should be omitted");
     }
 }
