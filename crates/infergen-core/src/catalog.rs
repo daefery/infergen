@@ -68,7 +68,7 @@ fn proposal_to_entry(proposal: &ProposedEvent, project_root: &Path) -> CatalogEn
     let provenance = vec![EventProvenance {
         source_path: rel_path,
         line: None,
-        adapter: String::new(),
+        adapter: proposal.adapter.clone(),
     }];
 
     let properties = proposal
@@ -308,6 +308,29 @@ mod tests {
         assert_eq!(props[1].name, "email");
         assert!(props[1].prop_type.is_none());
         assert!(props[1].pii);
+    }
+
+    #[test]
+    fn proposal_to_entry_adapter_propagates() {
+        let root = PathBuf::from("/project");
+        let mut proposal = make_proposal(
+            "user_signed_in",
+            EventKind::AuthEvent,
+            "/project/src/auth.ts",
+            0.85,
+        );
+        proposal.adapter = "nextjs".to_owned();
+        let entry = proposal_to_entry(&proposal, &root);
+        assert_eq!(entry.provenance[0].adapter, "nextjs");
+    }
+
+    #[test]
+    fn proposal_to_entry_empty_adapter_propagates() {
+        let root = PathBuf::from("/project");
+        let proposal = make_proposal("page_viewed", EventKind::PageView, "/project/pages/index.tsx", 0.9);
+        // adapter defaults to ""
+        let entry = proposal_to_entry(&proposal, &root);
+        assert_eq!(entry.provenance[0].adapter, "");
     }
 
     #[test]

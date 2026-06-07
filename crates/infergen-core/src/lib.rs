@@ -1,9 +1,9 @@
 //! Infergen scan engine.
 //!
-//! This crate will house the language parsers (E0.3), framework adapters
-//! (E0.4), the heuristic namer (E1.2), and codegen (E2.x). E0.1 seeded the
-//! shared error type and a version probe; E0.2 adds the project config schema
-//! ([`config`]) and language/framework auto-detection ([`detect`]).
+//! This crate houses language parsers (E0.3), framework adapters (E0.4),
+//! the heuristic namer (E1.2), and will house codegen (E2.x). E0.1 seeded
+//! the shared error type and a version probe; E0.2 adds the project config
+//! schema ([`config`]) and language/framework auto-detection ([`detect`]).
 
 use std::path::PathBuf;
 
@@ -11,6 +11,7 @@ pub mod adapter;
 pub mod catalog;
 pub mod config;
 pub mod detect;
+pub mod namer;
 pub mod parser;
 
 pub use adapter::nextjs::NextjsAdapter;
@@ -22,6 +23,7 @@ pub use infergen_types::{
     Catalog, CatalogEntry, CatalogEventKind, EventProperty, EventProvenance, EventStatus,
     CATALOG_SCHEMA_VERSION,
 };
+pub use namer::{NameResult, NameSignals, Namer};
 pub use parser::js::JsParser;
 pub use parser::{Diagnostic, LanguageParser, ParsedFile};
 

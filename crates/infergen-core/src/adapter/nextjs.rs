@@ -7,11 +7,16 @@
 //! 2. **AST-based** — runs when `file.with_js_program` succeeds (JS/TS only).
 //!    Detects NextAuth imports and form handler function names.
 //!
-//! Event names are heuristic drafts; E1.2 (Heuristic Namer) normalises them.
+//! Event names are derived via the heuristic namer (E1.2). All proposals
+//! carry `adapter = "nextjs"`.
 
 use std::path::{Path, PathBuf};
 
-use crate::{detect::Framework, parser::ParsedFile};
+use crate::{
+    detect::Framework,
+    namer::{NameSignals, Namer},
+    parser::ParsedFile,
+};
 
 use super::{Adapter, EventKind, ProposedEvent};
 
@@ -72,23 +77,6 @@ fn strip_js_ext(s: &str) -> &str {
         }
     }
     s
-}
-
-/// Convert a route string to a snake_case event-name prefix.
-///
-/// - `"/"` → `"home"`
-/// - `"/about"` → `"about"`
-/// - `"/blog/[slug]"` → `"blog_slug"`
-fn route_to_name_prefix(route: &str) -> String {
-    let stripped = route.trim_start_matches('/');
-    if stripped.is_empty() {
-        return "home".to_owned();
-    }
-    stripped
-        .replace('/', "_")
-        .replace(['[', ']'], "")
-        .replace('-', "_")
-        .to_lowercase()
 }
 
 /// Derive the canonical Next.js route string from a Pages Router path.
@@ -250,6 +238,7 @@ pub fn api_route_from_app_path(rel: &Path) -> Option<String> {
 fn detect_auth_from_ast(
     prog: &oxc_ast::ast::Program<'_>,
     source_path: &Path,
+    namer: &Namer,
 ) -> Vec<ProposedEvent> {
     use oxc_ast::ast::{ImportDeclarationSpecifier, ModuleExportName, Statement};
 
@@ -276,20 +265,44 @@ fn detect_auth_from_ast(
                 ModuleExportName::StringLiteral(s) => s.value.as_str(),
             };
             match imported_name {
-                "signIn" | "login" => events.push(
-                    ProposedEvent::new("user_signed_in", EventKind::AuthEvent, source_path, 0.85)
-                        .with_prop("method", Some("string")),
-                ),
-                "signOut" | "logout" => events.push(ProposedEvent::new(
-                    "user_signed_out",
-                    EventKind::AuthEvent,
-                    source_path,
-                    0.85,
-                )),
-                "signUp" | "register" => events.push(
-                    ProposedEvent::new("user_signed_up", EventKind::AuthEvent, source_path, 0.85)
-                        .with_prop("method", Some("string")),
-                ),
+                "signIn" | "login" => {
+                    let result = namer.derive(&NameSignals {
+                        handler_name: Some(imported_name),
+                        kind: EventKind::AuthEvent,
+                        route: None,
+                        component_name: None,
+                    });
+                    events.push(
+                        ProposedEvent::new(result.name, EventKind::AuthEvent, source_path, 0.85)
+                            .with_prop("method", Some("string")),
+                    );
+                }
+                "signOut" | "logout" => {
+                    let result = namer.derive(&NameSignals {
+                        handler_name: Some(imported_name),
+                        kind: EventKind::AuthEvent,
+                        route: None,
+                        component_name: None,
+                    });
+                    events.push(ProposedEvent::new(
+                        result.name,
+                        EventKind::AuthEvent,
+                        source_path,
+                        0.85,
+                    ));
+                }
+                "signUp" | "register" => {
+                    let result = namer.derive(&NameSignals {
+                        handler_name: Some(imported_name),
+                        kind: EventKind::AuthEvent,
+                        route: None,
+                        component_name: None,
+                    });
+                    events.push(
+                        ProposedEvent::new(result.name, EventKind::AuthEvent, source_path, 0.85)
+                            .with_prop("method", Some("string")),
+                    );
+                }
                 _ => {}
             }
         }
@@ -302,6 +315,7 @@ fn detect_auth_from_ast(
 fn detect_forms_from_ast(
     prog: &oxc_ast::ast::Program<'_>,
     source_path: &Path,
+    namer: &Namer,
 ) -> Vec<ProposedEvent> {
     use oxc_ast::ast::{BindingPattern, Expression, Statement};
 
@@ -317,8 +331,14 @@ fn detect_forms_from_ast(
                     let name = id.name.as_str();
                     if is_submit_name(name) && !seen_names.contains(&name.to_owned()) {
                         seen_names.push(name.to_owned());
+                        let result = namer.derive(&NameSignals {
+                            handler_name: Some(name),
+                            kind: EventKind::FormSubmit,
+                            route: None,
+                            component_name: None,
+                        });
                         events.push(ProposedEvent::new(
-                            "form_submitted",
+                            result.name,
                             EventKind::FormSubmit,
                             source_path,
                             0.7,
@@ -338,8 +358,14 @@ fn detect_forms_from_ast(
                             )
                         {
                             seen_names.push(name.to_owned());
+                            let result = namer.derive(&NameSignals {
+                                handler_name: Some(name),
+                                kind: EventKind::FormSubmit,
+                                route: None,
+                                component_name: None,
+                            });
                             events.push(ProposedEvent::new(
-                                "form_submitted",
+                                result.name,
                                 EventKind::FormSubmit,
                                 source_path,
                                 0.7,
@@ -362,6 +388,7 @@ fn detect_http_methods_from_ast(
     prog: &oxc_ast::ast::Program<'_>,
     source_path: &Path,
     route: &str,
+    namer: &Namer,
 ) -> Vec<ProposedEvent> {
     use oxc_ast::ast::{Declaration, Statement};
 
@@ -382,10 +409,14 @@ fn detect_http_methods_from_ast(
             continue;
         }
 
-        let prefix = route_to_name_prefix(route);
-        let name = format!("{prefix}_{}_api_called", method.to_lowercase());
+        let result = namer.derive(&NameSignals {
+            route: Some(route),
+            handler_name: Some(method),
+            kind: EventKind::ApiCall,
+            component_name: None,
+        });
         events.push(
-            ProposedEvent::new(name, EventKind::ApiCall, source_path, 0.95)
+            ProposedEvent::new(result.name, EventKind::ApiCall, source_path, 0.95)
                 .with_prop("endpoint", Some("string"))
                 .with_prop("method", Some("string")),
         );
@@ -401,61 +432,62 @@ fn detect_http_methods_from_ast(
 impl Adapter for NextjsAdapter {
     fn analyze(&self, file: &ParsedFile) -> Vec<ProposedEvent> {
         let mut events = Vec::new();
+        let namer = Namer::new();
 
         // --- Path-based detection ------------------------------------------
         if let Ok(rel) = file.path.strip_prefix(&self.project_root) {
             if let Some(route) = route_from_pages_path(rel) {
-                let prefix = route_to_name_prefix(&route);
+                let result = namer.derive(&NameSignals {
+                    route: Some(&route),
+                    kind: EventKind::PageView,
+                    component_name: None,
+                    handler_name: None,
+                });
                 events.push(
-                    ProposedEvent::new(
-                        format!("{prefix}_page_viewed"),
-                        EventKind::PageView,
-                        &file.path,
-                        0.9,
-                    )
-                    .with_prop("route", Some("string")),
+                    ProposedEvent::new(result.name, EventKind::PageView, &file.path, 0.9)
+                        .with_prop("route", Some("string")),
                 );
             } else if let Some(route) = route_from_app_path(rel) {
-                let prefix = route_to_name_prefix(&route);
+                let result = namer.derive(&NameSignals {
+                    route: Some(&route),
+                    kind: EventKind::PageView,
+                    component_name: None,
+                    handler_name: None,
+                });
                 events.push(
-                    ProposedEvent::new(
-                        format!("{prefix}_page_viewed"),
-                        EventKind::PageView,
-                        &file.path,
-                        0.9,
-                    )
-                    .with_prop("route", Some("string")),
+                    ProposedEvent::new(result.name, EventKind::PageView, &file.path, 0.9)
+                        .with_prop("route", Some("string")),
                 );
             } else if let Some(route) = api_route_from_pages_path(rel) {
-                let prefix = route_to_name_prefix(&route);
+                let result = namer.derive(&NameSignals {
+                    route: Some(&route),
+                    kind: EventKind::ApiCall,
+                    component_name: None,
+                    handler_name: None,
+                });
                 events.push(
-                    ProposedEvent::new(
-                        format!("{prefix}_api_called"),
-                        EventKind::ApiCall,
-                        &file.path,
-                        0.9,
-                    )
-                    .with_prop("endpoint", Some("string")),
+                    ProposedEvent::new(result.name, EventKind::ApiCall, &file.path, 0.9)
+                        .with_prop("endpoint", Some("string")),
                 );
             } else if let Some(route) = api_route_from_app_path(rel) {
                 let route_clone = route.clone();
                 let path_clone = file.path.clone();
                 let method_events = file
                     .with_js_program(|prog| {
-                        detect_http_methods_from_ast(prog, &path_clone, &route_clone)
+                        detect_http_methods_from_ast(prog, &path_clone, &route_clone, &namer)
                     })
                     .unwrap_or_default();
 
                 if method_events.is_empty() {
-                    let prefix = route_to_name_prefix(&route);
+                    let result = namer.derive(&NameSignals {
+                        route: Some(&route),
+                        kind: EventKind::ApiCall,
+                        component_name: None,
+                        handler_name: None,
+                    });
                     events.push(
-                        ProposedEvent::new(
-                            format!("{prefix}_api_called"),
-                            EventKind::ApiCall,
-                            &file.path,
-                            0.9,
-                        )
-                        .with_prop("endpoint", Some("string")),
+                        ProposedEvent::new(result.name, EventKind::ApiCall, &file.path, 0.9)
+                            .with_prop("endpoint", Some("string")),
                     );
                 } else {
                     events.extend(method_events);
@@ -465,13 +497,19 @@ impl Adapter for NextjsAdapter {
 
         // --- AST-based detection (JS/TS files only) -------------------------
         let source_path = file.path.clone();
+        let namer_ref = &namer;
         if let Some(ast_events) = file.with_js_program(|prog| {
             let mut v = Vec::new();
-            v.extend(detect_auth_from_ast(prog, &source_path));
-            v.extend(detect_forms_from_ast(prog, &source_path));
+            v.extend(detect_auth_from_ast(prog, &source_path, namer_ref));
+            v.extend(detect_forms_from_ast(prog, &source_path, namer_ref));
             v
         }) {
             events.extend(ast_events);
+        }
+
+        // Set adapter attribution on all proposals.
+        for event in &mut events {
+            event.adapter = "nextjs".to_owned();
         }
 
         events
@@ -487,7 +525,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::{JsParser, parser::LanguageParser};
+    use crate::{JsParser, namer::route_to_name_prefix, parser::LanguageParser};
 
     fn adapter(root: &str) -> NextjsAdapter {
         NextjsAdapter::new(PathBuf::from(root))
@@ -783,5 +821,42 @@ export async function POST(request: Request) { return Response.json({}); }
         let events = a.analyze(&file);
         assert!(events.iter().all(|e| e.kind != EventKind::PageView));
         assert!(events.iter().all(|e| e.kind != EventKind::ApiCall));
+    }
+
+    #[test]
+    fn all_proposals_carry_nextjs_attribution() {
+        let a = adapter("/proj");
+        // Page
+        let page = parse("/proj", "pages/about.tsx", "export default function About() {}");
+        for e in a.analyze(&page) {
+            assert_eq!(e.adapter, "nextjs", "page event missing adapter");
+        }
+        // Auth
+        let auth = parse(
+            "/proj",
+            "src/auth.ts",
+            "import { signIn } from 'next-auth/react';",
+        );
+        for e in a.analyze(&auth) {
+            assert_eq!(e.adapter, "nextjs", "auth event missing adapter");
+        }
+        // Form
+        let form = parse(
+            "/proj",
+            "src/form.tsx",
+            "function handleSubmit(e) { e.preventDefault(); }",
+        );
+        for e in a.analyze(&form) {
+            assert_eq!(e.adapter, "nextjs", "form event missing adapter");
+        }
+        // API
+        let api = parse(
+            "/proj",
+            "pages/api/users.ts",
+            "export default function handler(req, res) {}",
+        );
+        for e in a.analyze(&api) {
+            assert_eq!(e.adapter, "nextjs", "api event missing adapter");
+        }
     }
 }
