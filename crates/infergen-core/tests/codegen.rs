@@ -244,3 +244,42 @@ fn full_pipeline_unknown_provider_emits_comment() {
     assert!(ts.contains("custom-thing"), "provider name missing from comment");
     assert!(ts.contains("unknown provider"), "comment text missing");
 }
+
+#[test]
+fn full_pipeline_postgres_adapter_generated() {
+    let cat = make_catalog(vec![make_entry("page_viewed", EventStatus::Approved)]);
+    let ts = generate_typescript(&cat, &make_config_with_providers(&["postgres"]));
+    assert!(ts.contains("PostgresProvider"), "PostgresProvider missing");
+    assert!(ts.contains("execute:"), "execute callback missing");
+    assert!(ts.contains("infergen_events"), "default table name missing");
+}
+
+#[test]
+fn full_pipeline_mysql_adapter_generated() {
+    let cat = make_catalog(vec![make_entry("page_viewed", EventStatus::Approved)]);
+    let ts = generate_typescript(&cat, &make_config_with_providers(&["mysql"]));
+    assert!(ts.contains("MysqlProvider"), "MysqlProvider missing");
+    assert!(ts.contains("execute:"), "execute callback missing");
+}
+
+#[test]
+fn full_pipeline_sqlite_adapter_generated() {
+    let cat = make_catalog(vec![make_entry("page_viewed", EventStatus::Approved)]);
+    let ts = generate_typescript(&cat, &make_config_with_providers(&["sqlite"]));
+    assert!(ts.contains("SqliteProvider"), "SqliteProvider missing");
+    assert!(ts.contains("run:"), "run callback missing");
+}
+
+#[test]
+fn full_pipeline_file_adapter_generated() {
+    let ts = generate_typescript(&Catalog::default(), &make_config_with_providers(&["file"]));
+    assert!(ts.contains("FileProvider"), "FileProvider missing");
+    assert!(ts.contains("node:fs"), "Node.js fs import missing");
+}
+
+#[test]
+fn full_pipeline_console_adapter_generated() {
+    let ts = generate_typescript(&Catalog::default(), &make_config_with_providers(&["console"]));
+    assert!(ts.contains("ConsoleProvider"), "ConsoleProvider missing");
+    assert!(ts.contains("console.log"), "console.log missing");
+}

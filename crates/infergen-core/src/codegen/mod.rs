@@ -297,6 +297,11 @@ fn write_provider_adapters(out: &mut String, providers: &[ProviderConfig]) {
             "ga4"         => write_ga4_adapter(out),
             "rudderstack" => write_rudderstack_adapter(out),
             "webhook"     => write_webhook_adapter(out),
+            "postgres"    => write_postgres_adapter(out),
+            "mysql"       => write_mysql_adapter(out),
+            "sqlite"      => write_sqlite_adapter(out),
+            "file"        => write_file_adapter(out),
+            "console"     => write_console_adapter(out),
             name          => write_unknown_provider_comment(out, name),
         }
     }
@@ -538,6 +543,139 @@ export class HttpWebhookProvider implements Provider {
         timestamp: new Date().toISOString(),
       }),
     }).catch(() => {});
+  }
+}
+"#);
+}
+
+fn write_postgres_adapter(out: &mut String) {
+    out.push_str(r#"
+// ─── Postgres ─────────────────────────────────────────────────────────────
+// Server-side only. See `infergen schema --dialect postgres` for the table DDL.
+
+/** Construction options for PostgresProvider. */
+export interface PostgresProviderOptions {
+  /** Execute a parameterized SQL statement. Compatible with pg, postgres.js, knex, Drizzle, Prisma $executeRaw, etc. */
+  execute: (sql: string, params: unknown[]) => Promise<void>;
+  /** Target table name. Defaults to "infergen_events". */
+  table?: string;
+}
+
+/** Postgres analytics provider. Writes events to a database table — server-side only. */
+export class PostgresProvider implements Provider {
+  readonly id = "postgres";
+  constructor(private readonly options: PostgresProviderOptions) {}
+  track(eventName: string, properties: Record<string, unknown>): void {
+    const table = this.options.table ?? "infergen_events";
+    this.options.execute(
+      `INSERT INTO "${table}" (event_name, properties, created_at) VALUES ($1, $2::jsonb, NOW())`,
+      [eventName, JSON.stringify(properties)]
+    ).catch(() => {});
+  }
+}
+"#);
+}
+
+fn write_mysql_adapter(out: &mut String) {
+    out.push_str(r#"
+// ─── MySQL ────────────────────────────────────────────────────────────────
+// Server-side only. See `infergen schema --dialect mysql` for the table DDL.
+
+/** Construction options for MysqlProvider. */
+export interface MysqlProviderOptions {
+  /** Execute a parameterized SQL statement. Compatible with mysql2, knex, Drizzle, Prisma $executeRaw, etc. */
+  execute: (sql: string, params: unknown[]) => Promise<void>;
+  /** Target table name. Defaults to "infergen_events". */
+  table?: string;
+}
+
+/** MySQL analytics provider. Writes events to a database table — server-side only. */
+export class MysqlProvider implements Provider {
+  readonly id = "mysql";
+  constructor(private readonly options: MysqlProviderOptions) {}
+  track(eventName: string, properties: Record<string, unknown>): void {
+    const table = this.options.table ?? "infergen_events";
+    this.options.execute(
+      "INSERT INTO `" + table + "` (event_name, properties, created_at) VALUES (?, ?, NOW())",
+      [eventName, JSON.stringify(properties)]
+    ).catch(() => {});
+  }
+}
+"#);
+}
+
+fn write_sqlite_adapter(out: &mut String) {
+    out.push_str(r#"
+// ─── SQLite ───────────────────────────────────────────────────────────────
+// Server-side only. See `infergen schema --dialect sqlite` for the table DDL.
+
+/** Construction options for SqliteProvider. */
+export interface SqliteProviderOptions {
+  /** Execute a parameterized SQL statement. Compatible with better-sqlite3, node-sqlite3, sql.js, etc. */
+  run: (sql: string, params: unknown[]) => void | Promise<void>;
+  /** Target table name. Defaults to "infergen_events". */
+  table?: string;
+}
+
+/** SQLite analytics provider. Writes events to a database table — server-side only. */
+export class SqliteProvider implements Provider {
+  readonly id = "sqlite";
+  constructor(private readonly options: SqliteProviderOptions) {}
+  track(eventName: string, properties: Record<string, unknown>): void {
+    const table = this.options.table ?? "infergen_events";
+    void Promise.resolve(
+      this.options.run(
+        `INSERT INTO "${table}" (event_name, properties, created_at) VALUES (?, ?, ?)`,
+        [eventName, JSON.stringify(properties), new Date().toISOString()]
+      )
+    ).catch(() => {});
+  }
+}
+"#);
+}
+
+fn write_file_adapter(out: &mut String) {
+    out.push_str(r#"
+// ─── File ─────────────────────────────────────────────────────────────────
+// Server-side only (Node.js). Appends JSONL to a file.
+
+/** Construction options for FileProvider. */
+export interface FileProviderOptions {
+  /** Absolute or relative path to the JSONL log file. */
+  path: string;
+}
+
+/** File analytics provider. Appends events as JSONL — server-side (Node.js) only. */
+export class FileProvider implements Provider {
+  readonly id = "file";
+  constructor(private readonly options: FileProviderOptions) {}
+  track(eventName: string, properties: Record<string, unknown>): void {
+    import("node:fs").then(({ appendFile }) => {
+      const line = JSON.stringify({ event: eventName, properties, timestamp: new Date().toISOString() }) + "\n";
+      appendFile(this.options.path, line, () => {});
+    }).catch(() => {});
+  }
+}
+"#);
+}
+
+fn write_console_adapter(out: &mut String) {
+    out.push_str(r#"
+// ─── Console ──────────────────────────────────────────────────────────────
+
+/** Construction options for ConsoleProvider. */
+export interface ConsoleProviderOptions {
+  /** Optional prefix appended to each log line. */
+  prefix?: string;
+}
+
+/** Console analytics provider. Logs events to console — browser and Node.js. */
+export class ConsoleProvider implements Provider {
+  readonly id = "console";
+  constructor(private readonly options: ConsoleProviderOptions = {}) {}
+  track(eventName: string, properties: Record<string, unknown>): void {
+    const prefix = this.options.prefix ? `[${this.options.prefix}] ` : "";
+    console.log(`[infergen] ${prefix}${eventName}`, properties);
   }
 }
 "#);
@@ -909,5 +1047,41 @@ mod tests {
         let ts = generate_typescript(&Catalog::default(), &make_config_with_providers(&["custom-thing"]));
         assert!(ts.contains("custom-thing"), "provider name missing from comment\noutput:\n{ts}");
         assert!(ts.contains("unknown provider"), "comment text missing\noutput:\n{ts}");
+    }
+
+    #[test]
+    fn generate_postgres_adapter_when_configured() {
+        let ts = generate_typescript(&Catalog::default(), &make_config_with_providers(&["postgres"]));
+        assert!(ts.contains("PostgresProvider"), "PostgresProvider missing\noutput:\n{ts}");
+        assert!(ts.contains("execute:"), "execute callback missing\noutput:\n{ts}");
+        assert!(ts.contains("infergen_events"), "default table name missing\noutput:\n{ts}");
+    }
+
+    #[test]
+    fn generate_mysql_adapter_when_configured() {
+        let ts = generate_typescript(&Catalog::default(), &make_config_with_providers(&["mysql"]));
+        assert!(ts.contains("MysqlProvider"), "MysqlProvider missing\noutput:\n{ts}");
+        assert!(ts.contains("execute:"), "execute callback missing\noutput:\n{ts}");
+    }
+
+    #[test]
+    fn generate_sqlite_adapter_when_configured() {
+        let ts = generate_typescript(&Catalog::default(), &make_config_with_providers(&["sqlite"]));
+        assert!(ts.contains("SqliteProvider"), "SqliteProvider missing\noutput:\n{ts}");
+        assert!(ts.contains("run:"), "run callback missing\noutput:\n{ts}");
+    }
+
+    #[test]
+    fn generate_file_adapter_when_configured() {
+        let ts = generate_typescript(&Catalog::default(), &make_config_with_providers(&["file"]));
+        assert!(ts.contains("FileProvider"), "FileProvider missing\noutput:\n{ts}");
+        assert!(ts.contains("node:fs"), "Node.js fs import missing\noutput:\n{ts}");
+    }
+
+    #[test]
+    fn generate_console_adapter_when_configured() {
+        let ts = generate_typescript(&Catalog::default(), &make_config_with_providers(&["console"]));
+        assert!(ts.contains("ConsoleProvider"), "ConsoleProvider missing\noutput:\n{ts}");
+        assert!(ts.contains("console.log"), "console.log missing\noutput:\n{ts}");
     }
 }

@@ -53,7 +53,7 @@ Goal: one call site, many destinations, production-grade delivery.
 |---|---|---|---|---|
 | E3.1 | Provider Plugin Interface | Done    | Define the provider contract (identify, track, flush, shutdown). Plugin registration + config. | Depends on E2.1. |
 | E3.2 | First-Party Provider Adapters | Done    | Implement Segment, Amplitude, Mixpanel, PostHog, GA4, RudderStack, and a generic HTTP webhook provider. | Depends on E3.1. |
-| E3.2b | Database Destination Adapter | Planned | Write events directly to the project's own table (Postgres, MySQL, SQLite). Declarative event-table schema derived from the catalog + optional migration generation so the table matches event/property shapes. Server-side only. | Depends on E3.1, E1.1 (catalog drives schema). Bundle/file destination included here. |
+| E3.2b | Database Destination Adapter | Done    | Write events directly to the project's own table (Postgres, MySQL, SQLite). Declarative event-table schema derived from the catalog + optional migration generation so the table matches event/property shapes. Server-side only. | Depends on E3.1, E1.1 (catalog drives schema). Bundle/file destination included here. |
 | E3.3 | Delivery Engine | Planned | Batching, retry with backoff, persistent offline queue, sampling, flush-on-exit. Browser + Node runtimes. | Depends on E3.1. |
 | E3.4 | Consent & PII Controls | Planned | Consent gating, per-property redaction hooks, opt-out, region routing. Uses PII flags from E1.4. | Depends on E3.3, E1.4. |
 

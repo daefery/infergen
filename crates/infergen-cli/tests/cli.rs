@@ -303,6 +303,117 @@ fn generate_without_config_no_adapter_section() {
     assert!(!ts.contains("Provider Adapters"), "unexpected adapter section without config");
 }
 
+// ---------------------------------------------------------------------------
+// schema sub-command tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn schema_listed_in_help() {
+    infergen()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(contains("schema"));
+}
+
+#[test]
+fn schema_postgres_empty_catalog_outputs_create_table() {
+    let dir = tempdir().unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .args(["schema", "--dialect", "postgres"])
+        .assert()
+        .success()
+        .stdout(contains("infergen_events"))
+        .stdout(contains("JSONB"));
+}
+
+#[test]
+fn schema_mysql_empty_catalog_outputs_create_table() {
+    let dir = tempdir().unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .args(["schema", "--dialect", "mysql"])
+        .assert()
+        .success()
+        .stdout(contains("infergen_events"))
+        .stdout(contains("JSON"));
+}
+
+#[test]
+fn schema_sqlite_empty_catalog_outputs_create_table() {
+    let dir = tempdir().unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .args(["schema", "--dialect", "sqlite"])
+        .assert()
+        .success()
+        .stdout(contains("infergen_events"))
+        .stdout(contains("AUTOINCREMENT"));
+}
+
+#[test]
+fn schema_default_dialect_is_postgres() {
+    let dir = tempdir().unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .arg("schema")
+        .assert()
+        .success()
+        .stdout(contains("JSONB")); // Postgres-specific keyword
+}
+
+#[test]
+fn schema_writes_to_output_file() {
+    let dir = tempdir().unwrap();
+    let out = dir.path().join("schema.sql");
+    infergen()
+        .current_dir(dir.path())
+        .args(["schema", "--output", out.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(contains("wrote"));
+    assert!(out.exists(), "output file not created");
+    let sql = std::fs::read_to_string(&out).unwrap();
+    assert!(sql.contains("infergen_events"), "events table missing from file");
+}
+
+#[test]
+fn generate_with_console_config_emits_adapter() {
+    let dir = tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("infergen.config.json"),
+        r#"{"providers":[{"name":"console"}]}"#,
+    ).unwrap();
+    let out = dir.path().join("sdk.ts");
+    infergen()
+        .current_dir(dir.path())
+        .args(["generate", "--output", out.to_str().unwrap()])
+        .assert()
+        .success();
+    let ts = std::fs::read_to_string(&out).unwrap();
+    assert!(ts.contains("ConsoleProvider"), "ConsoleProvider not generated");
+    assert!(ts.contains("console.log"), "console.log missing");
+}
+
+#[test]
+fn generate_with_postgres_config_emits_adapter() {
+    let dir = tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("infergen.config.json"),
+        r#"{"providers":[{"name":"postgres"}]}"#,
+    ).unwrap();
+    let out = dir.path().join("sdk.ts");
+    infergen()
+        .current_dir(dir.path())
+        .args(["generate", "--output", out.to_str().unwrap()])
+        .assert()
+        .success();
+    let ts = std::fs::read_to_string(&out).unwrap();
+    assert!(ts.contains("PostgresProvider"), "PostgresProvider not generated");
+    assert!(ts.contains("infergen_events"), "default table name missing");
+}
+
 /// Single-event YAML block for multi-event fixture building.
 fn minimal_event_yaml(id: &str, name: &str, status: &str) -> String {
     format!(

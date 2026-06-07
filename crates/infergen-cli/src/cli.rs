@@ -26,6 +26,8 @@ pub enum Commands {
     Scan,
     /// Generate a TypeScript SDK from the approved catalog.
     Generate(GenerateArgs),
+    /// Generate a SQL schema (CREATE TABLE + typed views) from the approved catalog.
+    Schema(SchemaArgs),
     /// CI check: fail on drift / untracked moments. (Lands in E4.2.)
     Check,
     /// Watch files and re-scan on change. (Lands in E4.3.)
@@ -49,6 +51,31 @@ pub struct GenerateArgs {
     /// Check whether the output file is up to date; exit non-zero if stale. Does not write.
     #[arg(long)]
     pub check: bool,
+}
+
+/// Arguments for `infergen schema`.
+#[derive(Debug, Args)]
+pub struct SchemaArgs {
+    /// SQL dialect to generate.
+    #[arg(long, value_enum, default_value_t = SchemaDialect::Postgres)]
+    pub dialect: SchemaDialect,
+    /// Path to the catalog file.
+    #[arg(long, default_value = DEFAULT_CATALOG)]
+    pub catalog: PathBuf,
+    /// Output file path. Prints to stdout when omitted.
+    #[arg(long)]
+    pub output: Option<PathBuf>,
+}
+
+/// SQL dialect for `infergen schema`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum SchemaDialect {
+    /// PostgreSQL — JSONB, BIGSERIAL, TIMESTAMPTZ.
+    Postgres,
+    /// MySQL / MariaDB — JSON, BIGINT UNSIGNED AUTO_INCREMENT, DATETIME.
+    Mysql,
+    /// SQLite — TEXT properties column, INTEGER AUTOINCREMENT.
+    Sqlite,
 }
 
 /// Arguments for `infergen review`.
