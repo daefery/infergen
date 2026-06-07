@@ -46,8 +46,8 @@ pub struct PropertyHint {
 /// schema (E1.1) defines the persistent format after a human approves/edits.
 #[derive(Debug, Clone)]
 pub struct ProposedEvent {
-    /// Heuristic event name. Not yet normalised (E1.2) or convention-enforced
-    /// (E1.3). Reviewers may rename freely.
+    /// Heuristic event name. Not yet convention-enforced (E1.3). Reviewers may
+    /// rename freely.
     pub name: String,
     /// Category of tracking moment.
     pub kind: EventKind,
@@ -59,6 +59,10 @@ pub struct ProposedEvent {
     pub confidence: f32,
     /// Candidate event properties.
     pub properties: Vec<PropertyHint>,
+    /// Name of the adapter that produced this proposal, e.g. `"nextjs"`.
+    /// Defaults to `""` when not set. Flows to `EventProvenance.adapter` in
+    /// the catalog (E1.1+E1.2).
+    pub adapter: String,
 }
 
 impl ProposedEvent {
@@ -76,6 +80,7 @@ impl ProposedEvent {
             source_path: source_path.into(),
             confidence,
             properties: Vec::new(),
+            adapter: String::new(),
         }
     }
 
@@ -87,6 +92,13 @@ impl ProposedEvent {
             type_hint: type_hint.map(str::to_owned),
             pii_hint: false,
         });
+        self
+    }
+
+    /// Set the adapter attribution and return `self` for chaining.
+    #[must_use]
+    pub fn with_adapter(mut self, adapter: impl Into<String>) -> Self {
+        self.adapter = adapter.into();
         self
     }
 }
@@ -154,5 +166,27 @@ mod tests {
             0.9,
         );
         assert_eq!(e.source_path, PathBuf::from("pages/api/foo.ts"));
+    }
+
+    #[test]
+    fn proposed_event_adapter_defaults_empty() {
+        let e = ProposedEvent::new("page_viewed", EventKind::PageView, "app.ts", 0.9);
+        assert_eq!(e.adapter, "");
+    }
+
+    #[test]
+    fn with_adapter_sets_name() {
+        let e = ProposedEvent::new("page_viewed", EventKind::PageView, "app.ts", 0.9)
+            .with_adapter("nextjs");
+        assert_eq!(e.adapter, "nextjs");
+    }
+
+    #[test]
+    fn with_adapter_chains_with_with_prop() {
+        let e = ProposedEvent::new("page_viewed", EventKind::PageView, "app.ts", 0.9)
+            .with_prop("route", Some("string"))
+            .with_adapter("nextjs");
+        assert_eq!(e.adapter, "nextjs");
+        assert_eq!(e.properties.len(), 1);
     }
 }
