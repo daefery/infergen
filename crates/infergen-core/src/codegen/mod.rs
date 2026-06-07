@@ -7,7 +7,7 @@
 
 use infergen_types::{CatalogEntry, EventProperty, EventStatus};
 
-use crate::{Catalog, CATALOG_SCHEMA_VERSION};
+use crate::{Catalog, CATALOG_SCHEMA_VERSION, config::ProviderConfig};
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -20,6 +20,10 @@ pub struct CodegenConfig {
     ///
     /// Default: `false` — only approved events are emitted.
     pub include_proposed: bool,
+    /// Provider adapters to generate. Populated from `infergen.config.*`.
+    ///
+    /// Empty (default) — no adapter section emitted.
+    pub providers: Vec<ProviderConfig>,
 }
 
 
@@ -60,6 +64,9 @@ pub fn generate_typescript(catalog: &Catalog, config: &CodegenConfig) -> String 
     }
 
     write_track_object(&mut out, &events);
+    if !config.providers.is_empty() {
+        write_provider_adapters(&mut out, &config.providers);
+    }
     out
 }
 
@@ -274,6 +281,278 @@ fn write_track_object(out: &mut String, events: &[&CatalogEntry]) {
 }
 
 // ---------------------------------------------------------------------------
+// Provider adapter generation
+// ---------------------------------------------------------------------------
+
+fn write_provider_adapters(out: &mut String, providers: &[ProviderConfig]) {
+    out.push_str("\n// ---------------------------------------------------------------------------\n");
+    out.push_str("// Provider Adapters — generated from infergen.config.*\n");
+    out.push_str("// ---------------------------------------------------------------------------\n");
+    for p in providers {
+        match p.name.as_str() {
+            "posthog"     => write_posthog_adapter(out),
+            "segment"     => write_segment_adapter(out),
+            "amplitude"   => write_amplitude_adapter(out),
+            "mixpanel"    => write_mixpanel_adapter(out),
+            "ga4"         => write_ga4_adapter(out),
+            "rudderstack" => write_rudderstack_adapter(out),
+            "webhook"     => write_webhook_adapter(out),
+            name          => write_unknown_provider_comment(out, name),
+        }
+    }
+}
+
+fn write_posthog_adapter(out: &mut String) {
+    out.push_str(r#"
+// ─── PostHog ──────────────────────────────────────────────────────────────
+
+/** Construction options for PostHogProvider. */
+export interface PostHogProviderOptions {
+  /** PostHog project API key. */
+  apiKey: string;
+  /** Ingestion host. Defaults to "https://us.i.posthog.com". */
+  host?: string;
+}
+
+/** PostHog analytics provider. Uses PostHog Capture API — no SDK required. */
+export class PostHogProvider implements Provider {
+  readonly id = "posthog";
+  constructor(private readonly options: PostHogProviderOptions) {}
+  track(eventName: string, properties: Record<string, unknown>): void {
+    const host = this.options.host ?? "https://us.i.posthog.com";
+    fetch(`${host}/capture/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: this.options.apiKey,
+        event: eventName,
+        properties,
+        timestamp: new Date().toISOString(),
+      }),
+    }).catch(() => {});
+  }
+}
+"#);
+}
+
+fn write_segment_adapter(out: &mut String) {
+    out.push_str(r#"
+// ─── Segment ──────────────────────────────────────────────────────────────
+
+/** Construction options for SegmentProvider. */
+export interface SegmentProviderOptions {
+  /** Segment source write key. */
+  writeKey: string;
+  /** API host. Defaults to "https://api.segment.io". */
+  host?: string;
+  /** Anonymous user ID. Defaults to "anonymous". */
+  anonymousId?: string;
+}
+
+/** Segment analytics provider. Uses Segment HTTP API — no SDK required. */
+export class SegmentProvider implements Provider {
+  readonly id = "segment";
+  constructor(private readonly options: SegmentProviderOptions) {}
+  track(eventName: string, properties: Record<string, unknown>): void {
+    const host = this.options.host ?? "https://api.segment.io";
+    const creds = btoa(`${this.options.writeKey}:`);
+    fetch(`${host}/v1/track`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${creds}`,
+      },
+      body: JSON.stringify({
+        type: "track",
+        anonymousId: this.options.anonymousId ?? "anonymous",
+        event: eventName,
+        properties,
+        timestamp: new Date().toISOString(),
+      }),
+    }).catch(() => {});
+  }
+}
+"#);
+}
+
+fn write_amplitude_adapter(out: &mut String) {
+    out.push_str(r#"
+// ─── Amplitude ────────────────────────────────────────────────────────────
+
+/** Construction options for AmplitudeProvider. */
+export interface AmplitudeProviderOptions {
+  /** Amplitude project API key. */
+  apiKey: string;
+  /** API server URL. Defaults to "https://api2.amplitude.com". */
+  serverUrl?: string;
+}
+
+/** Amplitude analytics provider. Uses Amplitude HTTP API v2 — no SDK required. */
+export class AmplitudeProvider implements Provider {
+  readonly id = "amplitude";
+  constructor(private readonly options: AmplitudeProviderOptions) {}
+  track(eventName: string, properties: Record<string, unknown>): void {
+    const serverUrl = this.options.serverUrl ?? "https://api2.amplitude.com";
+    fetch(`${serverUrl}/2/httpapi`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: this.options.apiKey,
+        events: [{ event_type: eventName, event_properties: properties, time: Date.now() }],
+      }),
+    }).catch(() => {});
+  }
+}
+"#);
+}
+
+fn write_mixpanel_adapter(out: &mut String) {
+    out.push_str(r#"
+// ─── Mixpanel ─────────────────────────────────────────────────────────────
+
+/** Construction options for MixpanelProvider. */
+export interface MixpanelProviderOptions {
+  /** Mixpanel project token. */
+  token: string;
+  /** API URL. Defaults to "https://api.mixpanel.com". */
+  apiUrl?: string;
+}
+
+/** Mixpanel analytics provider. Uses Mixpanel Track API — no SDK required. */
+export class MixpanelProvider implements Provider {
+  readonly id = "mixpanel";
+  constructor(private readonly options: MixpanelProviderOptions) {}
+  track(eventName: string, properties: Record<string, unknown>): void {
+    const apiUrl = this.options.apiUrl ?? "https://api.mixpanel.com";
+    fetch(`${apiUrl}/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: [{ event: eventName, properties: { token: this.options.token, ...properties } }] }),
+    }).catch(() => {});
+  }
+}
+"#);
+}
+
+fn write_ga4_adapter(out: &mut String) {
+    out.push_str(r#"
+// ─── Google Analytics 4 ───────────────────────────────────────────────────
+
+/** Construction options for Ga4Provider. */
+export interface Ga4ProviderOptions {
+  /** GA4 Measurement ID (G-XXXXXXXX). */
+  measurementId: string;
+  /** GA4 Measurement Protocol API secret. */
+  apiSecret: string;
+  /** Client ID. Defaults to "anonymous". */
+  clientId?: string;
+}
+
+/** GA4 analytics provider. Uses GA4 Measurement Protocol — no SDK required. */
+export class Ga4Provider implements Provider {
+  readonly id = "ga4";
+  constructor(private readonly options: Ga4ProviderOptions) {}
+  track(eventName: string, properties: Record<string, unknown>): void {
+    const url =
+      `https://www.google-analytics.com/mp/collect` +
+      `?measurement_id=${this.options.measurementId}` +
+      `&api_secret=${this.options.apiSecret}`;
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: this.options.clientId ?? "anonymous",
+        events: [{ name: eventName, params: properties }],
+      }),
+    }).catch(() => {});
+  }
+}
+"#);
+}
+
+fn write_rudderstack_adapter(out: &mut String) {
+    out.push_str(r#"
+// ─── RudderStack ──────────────────────────────────────────────────────────
+
+/** Construction options for RudderStackProvider. */
+export interface RudderStackProviderOptions {
+  /** RudderStack source write key. */
+  writeKey: string;
+  /** RudderStack data plane URL (e.g. "https://yourapp.dataplane.rudderstack.com"). */
+  dataPlaneUrl: string;
+  /** Anonymous user ID. Defaults to "anonymous". */
+  anonymousId?: string;
+}
+
+/** RudderStack analytics provider. Uses RudderStack HTTP API — no SDK required. */
+export class RudderStackProvider implements Provider {
+  readonly id = "rudderstack";
+  constructor(private readonly options: RudderStackProviderOptions) {}
+  track(eventName: string, properties: Record<string, unknown>): void {
+    const creds = btoa(`${this.options.writeKey}:`);
+    fetch(`${this.options.dataPlaneUrl}/v1/track`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${creds}`,
+      },
+      body: JSON.stringify({
+        type: "track",
+        anonymousId: this.options.anonymousId ?? "anonymous",
+        event: eventName,
+        properties,
+        timestamp: new Date().toISOString(),
+      }),
+    }).catch(() => {});
+  }
+}
+"#);
+}
+
+fn write_webhook_adapter(out: &mut String) {
+    out.push_str(r#"
+// ─── HTTP Webhook ─────────────────────────────────────────────────────────
+
+/** Construction options for HttpWebhookProvider. */
+export interface HttpWebhookProviderOptions {
+  /** Full URL to POST events to. */
+  url: string;
+  /** Optional additional headers (e.g. Authorization). */
+  headers?: Record<string, string>;
+}
+
+/** Generic HTTP webhook provider. POSTs JSON to any URL — no SDK required. */
+export class HttpWebhookProvider implements Provider {
+  readonly id = "webhook";
+  constructor(private readonly options: HttpWebhookProviderOptions) {}
+  track(eventName: string, properties: Record<string, unknown>): void {
+    fetch(this.options.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(this.options.headers ?? {}),
+      },
+      body: JSON.stringify({
+        event: eventName,
+        properties,
+        timestamp: new Date().toISOString(),
+      }),
+    }).catch(() => {});
+  }
+}
+"#);
+}
+
+fn write_unknown_provider_comment(out: &mut String, name: &str) {
+    out.push_str(&format!(
+        "\n// ─── {} ─── unknown provider — no adapter generated ──────────────────────\n",
+        name
+    ));
+    out.push_str("// Implement the Provider interface to add a custom provider:\n");
+    out.push_str("//   export class MyProvider implements Provider { ... }\n");
+}
+
+// ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
 
@@ -456,7 +735,7 @@ mod tests {
     #[test]
     fn generate_includes_proposed_with_flag() {
         let cat = make_catalog(vec![make_entry("maybe_event", EventStatus::Proposed)]);
-        let config = CodegenConfig { include_proposed: true };
+        let config = CodegenConfig { include_proposed: true, ..Default::default() };
         let ts = generate_typescript(&cat, &config);
         assert!(ts.contains("maybe_event"), "output:\n{ts}");
     }
@@ -568,5 +847,67 @@ mod tests {
         let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
         assert!(ts.contains("export interface Provider"), "preamble missing\noutput:\n{ts}");
         assert!(ts.contains("configureInfergen"), "configureInfergen missing\noutput:\n{ts}");
+    }
+
+    // --- provider adapter generation ---
+
+    fn make_config_with_providers(names: &[&str]) -> CodegenConfig {
+        CodegenConfig {
+            providers: names.iter().map(|n| {
+                crate::config::ProviderConfig { name: n.to_string(), ..Default::default() }
+            }).collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn generate_posthog_adapter_when_configured() {
+        let ts = generate_typescript(&Catalog::default(), &make_config_with_providers(&["posthog"]));
+        assert!(ts.contains("PostHogProvider"), "PostHogProvider missing\noutput:\n{ts}");
+        assert!(ts.contains("PostHogProviderOptions"), "options interface missing\noutput:\n{ts}");
+        assert!(ts.contains("us.i.posthog.com"), "PostHog endpoint missing\noutput:\n{ts}");
+    }
+
+    #[test]
+    fn generate_segment_adapter_when_configured() {
+        let ts = generate_typescript(&Catalog::default(), &make_config_with_providers(&["segment"]));
+        assert!(ts.contains("SegmentProvider"), "SegmentProvider missing\noutput:\n{ts}");
+        assert!(ts.contains("SegmentProviderOptions"), "options interface missing\noutput:\n{ts}");
+    }
+
+    #[test]
+    fn generate_no_providers_no_adapter_section() {
+        let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+        assert!(!ts.contains("PostHogProvider"), "unexpected PostHogProvider\noutput:\n{ts}");
+        assert!(!ts.contains("Provider Adapters"), "unexpected adapter section\noutput:\n{ts}");
+    }
+
+    #[test]
+    fn generate_all_seven_adapters() {
+        let config = make_config_with_providers(&[
+            "posthog", "segment", "amplitude", "mixpanel", "ga4", "rudderstack", "webhook",
+        ]);
+        let ts = generate_typescript(&Catalog::default(), &config);
+        assert!(ts.contains("PostHogProvider"), "posthog missing");
+        assert!(ts.contains("SegmentProvider"), "segment missing");
+        assert!(ts.contains("AmplitudeProvider"), "amplitude missing");
+        assert!(ts.contains("MixpanelProvider"), "mixpanel missing");
+        assert!(ts.contains("Ga4Provider"), "ga4 missing");
+        assert!(ts.contains("RudderStackProvider"), "rudderstack missing");
+        assert!(ts.contains("HttpWebhookProvider"), "webhook missing");
+    }
+
+    #[test]
+    fn generate_webhook_adapter_when_configured() {
+        let ts = generate_typescript(&Catalog::default(), &make_config_with_providers(&["webhook"]));
+        assert!(ts.contains("HttpWebhookProvider"), "HttpWebhookProvider missing\noutput:\n{ts}");
+        assert!(ts.contains("HttpWebhookProviderOptions"), "options interface missing\noutput:\n{ts}");
+    }
+
+    #[test]
+    fn generate_unknown_provider_emits_comment() {
+        let ts = generate_typescript(&Catalog::default(), &make_config_with_providers(&["custom-thing"]));
+        assert!(ts.contains("custom-thing"), "provider name missing from comment\noutput:\n{ts}");
+        assert!(ts.contains("unknown provider"), "comment text missing\noutput:\n{ts}");
     }
 }
