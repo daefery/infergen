@@ -29,7 +29,7 @@ Goal: turn raw detections into a reviewable, durable, convention-enforced tracki
 | E1.2 | Heuristic Event Namer | Done | Derive event names + property candidates from identifiers (components, routes, handlers). Apply naming convention. Assign confidence scores. | Depends on E1.1. |
 | E1.3 | Naming Convention Engine & Linter | Done | Configurable conventions (`entity.action.state`, snake_case, etc.). Lint catalog for violations; auto-suggest fixes. Ship sensible default. | Depends on E1.2. |
 | E1.4 | Property Type Inference | Done | Infer property types from AST context (function params, form fields, TS types). Flag likely PII (email, name, phone, address). | Depends on E0.3, E1.1. |
-| E1.5 | Review Workflow | Planned | Mark events `approved` / `ignored`; edit names/props inline. Diff view between scan result and existing catalog. | Depends on E1.1. |
+| E1.5 | Review Workflow | Done | Mark events `approved` / `ignored`; edit names/props inline. Diff view between scan result and existing catalog. | Depends on E1.1. |
 
 ---
 

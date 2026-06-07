@@ -4,6 +4,9 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
+// Default catalog path used by review sub-commands.
+pub const DEFAULT_CATALOG: &str = ".infergen/catalog.yaml";
+
 /// Infergen — scan code, infer a typed analytics catalog, generate a
 /// type-safe, multi-provider SDK.
 #[derive(Debug, Parser)]
@@ -27,6 +30,59 @@ pub enum Commands {
     Check,
     /// Watch files and re-scan on change. (Lands in E4.3.)
     Watch,
+    /// Review and annotate the event catalog.
+    Review(ReviewArgs),
+}
+
+/// Arguments for `infergen review`.
+#[derive(Debug, Args)]
+pub struct ReviewArgs {
+    /// Sub-command to run.
+    #[command(subcommand)]
+    pub action: ReviewAction,
+    /// Path to the catalog file.
+    #[arg(long, global = true, default_value = DEFAULT_CATALOG)]
+    pub catalog: PathBuf,
+}
+
+/// `infergen review` sub-commands.
+#[derive(Debug, Subcommand)]
+pub enum ReviewAction {
+    /// List catalog events (filter by --status).
+    List {
+        /// Show only events with this status: `proposed`, `approved`, `ignored`, or `all`.
+        #[arg(long, default_value = "all")]
+        status: String,
+    },
+    /// Approve an event by stable ID.
+    Approve {
+        /// Stable event ID (e.g. `evt_0123456789abcdef`).
+        id: String,
+    },
+    /// Ignore an event by stable ID (mark as false positive).
+    Ignore {
+        /// Stable event ID.
+        id: String,
+    },
+    /// Rename an event.
+    Rename {
+        /// Stable event ID.
+        id: String,
+        /// New event name.
+        new_name: String,
+    },
+    /// Set the human-readable description of an event.
+    Describe {
+        /// Stable event ID.
+        id: String,
+        /// Description text.
+        description: String,
+    },
+    /// Show the diff between a proposed catalog and the existing catalog.
+    Diff {
+        /// Path to the proposed catalog (output of `infergen scan`).
+        proposed: PathBuf,
+    },
 }
 
 /// Arguments for `infergen init`.
