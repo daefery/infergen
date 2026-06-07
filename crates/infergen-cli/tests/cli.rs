@@ -147,6 +147,136 @@ fn scan_rescan_keeps_approved_when_no_source_match() {
     assert!(after.contains("approved"), "status must remain approved");
 }
 
+// ── E4.2 check integration tests ────────────────────────────────────────────
+
+#[test]
+fn check_no_catalog_fails() {
+    let dir = tempdir().unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .arg("check")
+        .assert()
+        .failure()
+        .stderr(contains("infergen scan"));
+}
+
+#[test]
+fn check_clean_approved_catalog_succeeds() {
+    let dir = tempdir().unwrap();
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    std::fs::write(
+        catalog_dir.join("catalog.yaml"),
+        minimal_catalog_yaml("evt_clean0000000000", "page_viewed", "approved"),
+    )
+    .unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .arg("check")
+        .assert()
+        .success()
+        .stdout(contains("OK"));
+}
+
+#[test]
+fn check_proposed_event_fails() {
+    let dir = tempdir().unwrap();
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    std::fs::write(
+        catalog_dir.join("catalog.yaml"),
+        minimal_catalog_yaml("evt_prop0000000000", "page_viewed", "proposed"),
+    )
+    .unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .arg("check")
+        .assert()
+        .failure()
+        .stdout(contains("unreviewed"));
+}
+
+#[test]
+fn check_new_untracked_moment_fails() {
+    let dir = tempdir().unwrap();
+    // Seed catalog with an approved event whose ID won't match the scanned Next.js page event
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    std::fs::write(
+        catalog_dir.join("catalog.yaml"),
+        minimal_catalog_yaml("evt_0000000000000001", "some_other_event", "approved"),
+    )
+    .unwrap();
+    // Add a Next.js page — scan will detect a new event not in the catalog
+    let pages_dir = dir.path().join("pages");
+    std::fs::create_dir_all(&pages_dir).unwrap();
+    std::fs::write(
+        pages_dir.join("index.tsx"),
+        "export default function HomePage() { return null; }",
+    )
+    .unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .arg("check")
+        .assert()
+        .failure()
+        .stdout(contains("untracked"));
+}
+
+#[test]
+fn check_convention_violation_fails() {
+    let dir = tempdir().unwrap();
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    // "pageViewed" violates the default snake_case convention
+    std::fs::write(
+        catalog_dir.join("catalog.yaml"),
+        minimal_catalog_yaml("evt_conv0000000000", "pageViewed", "approved"),
+    )
+    .unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .arg("check")
+        .assert()
+        .failure()
+        .stdout(contains("violation"));
+}
+
+#[test]
+fn check_output_lists_unreviewed_with_question_mark() {
+    let dir = tempdir().unwrap();
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    std::fs::write(
+        catalog_dir.join("catalog.yaml"),
+        minimal_catalog_yaml("evt_prop1111111111", "signup_clicked", "proposed"),
+    )
+    .unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .arg("check")
+        .assert()
+        .failure()
+        .stdout(contains("?"));
+}
+
+#[test]
+fn check_custom_catalog_path() {
+    let dir = tempdir().unwrap();
+    let custom_catalog = dir.path().join("my_catalog.yaml");
+    std::fs::write(
+        &custom_catalog,
+        minimal_catalog_yaml("evt_custom000000000", "home_viewed", "approved"),
+    )
+    .unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .args(["check", "--catalog", custom_catalog.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(contains("OK"));
+}
+
 #[test]
 fn generate_empty_catalog_succeeds() {
     let dir = tempdir().unwrap();

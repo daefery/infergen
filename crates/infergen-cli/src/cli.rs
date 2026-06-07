@@ -26,8 +26,8 @@ pub enum Commands {
     Scan,
     /// Generate a TypeScript SDK from the approved catalog.
     Generate(GenerateArgs),
-    /// CI check: fail on drift / untracked moments. (Lands in E4.2.)
-    Check,
+    /// CI check: fail on untracked moments, unreviewed events, or convention violations.
+    Check(CheckArgs),
     /// Watch files and re-scan on change. (Lands in E4.3.)
     Watch,
     /// Review and annotate the event catalog.
@@ -49,6 +49,15 @@ pub struct GenerateArgs {
     /// Check whether the output file is up to date; exit non-zero if stale. Does not write.
     #[arg(long)]
     pub check: bool,
+}
+
+/// Arguments for `infergen check`.
+#[derive(Debug, Args)]
+pub struct CheckArgs {
+    /// Path to the catalog file. Defaults to the path in `infergen.config.*`
+    /// (or `.infergen/catalog.yaml` if no config file exists).
+    #[arg(long)]
+    pub catalog: Option<PathBuf>,
 }
 
 /// Arguments for `infergen review`.
