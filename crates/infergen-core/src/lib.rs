@@ -11,6 +11,7 @@ pub mod adapter;
 pub mod catalog;
 pub mod config;
 pub mod detect;
+pub mod linter;
 pub mod namer;
 pub mod parser;
 
@@ -23,6 +24,7 @@ pub use infergen_types::{
     Catalog, CatalogEntry, CatalogEventKind, EventProperty, EventProvenance, EventStatus,
     CATALOG_SCHEMA_VERSION,
 };
+pub use linter::{ConventionCase, LintRule, LintViolation, lint_catalog};
 pub use namer::{NameResult, NameSignals, Namer};
 pub use parser::js::JsParser;
 pub use parser::{Diagnostic, LanguageParser, ParsedFile};
