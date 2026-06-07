@@ -16,6 +16,7 @@ use crate::{
     detect::Framework,
     namer::{NameSignals, Namer},
     parser::ParsedFile,
+    property,
 };
 
 use super::{Adapter, EventKind, ProposedEvent};
@@ -337,12 +338,15 @@ fn detect_forms_from_ast(
                             route: None,
                             component_name: None,
                         });
-                        events.push(ProposedEvent::new(
+                        let param_hints = property::hints_from_params(&func.params);
+                        let mut event = ProposedEvent::new(
                             result.name,
                             EventKind::FormSubmit,
                             source_path,
                             0.7,
-                        ));
+                        );
+                        event.properties = param_hints;
+                        events.push(event);
                     }
                 }
             }
@@ -364,12 +368,22 @@ fn detect_forms_from_ast(
                                 route: None,
                                 component_name: None,
                             });
-                            events.push(ProposedEvent::new(
+                            let param_hints =
+                                if let Some(Expression::ArrowFunctionExpression(arrow)) =
+                                    &declarator.init
+                                {
+                                    property::hints_from_params(&arrow.params)
+                                } else {
+                                    vec![]
+                                };
+                            let mut event = ProposedEvent::new(
                                 result.name,
                                 EventKind::FormSubmit,
                                 source_path,
                                 0.7,
-                            ));
+                            );
+                            event.properties = param_hints;
+                            events.push(event);
                         }
                     }
                 }
@@ -501,10 +515,31 @@ impl Adapter for NextjsAdapter {
         if let Some(ast_events) = file.with_js_program(|prog| {
             let mut v = Vec::new();
             v.extend(detect_auth_from_ast(prog, &source_path, namer_ref));
-            v.extend(detect_forms_from_ast(prog, &source_path, namer_ref));
+
+            let mut form_events = detect_forms_from_ast(prog, &source_path, namer_ref);
+            // Merge JSX input field names into form events (dedup by name).
+            if !form_events.is_empty() {
+                let jsx_hints = property::hints_from_jsx_inputs(prog);
+                if !jsx_hints.is_empty() {
+                    for form_event in &mut form_events {
+                        for hint in &jsx_hints {
+                            if !form_event.properties.iter().any(|p| p.name == hint.name) {
+                                form_event.properties.push(hint.clone());
+                            }
+                        }
+                    }
+                }
+            }
+            v.extend(form_events);
             v
         }) {
             events.extend(ast_events);
+        }
+
+        // Enrich all events' properties: fill missing types + set PII flags.
+        for event in &mut events {
+            let props = std::mem::take(&mut event.properties);
+            event.properties = property::enrich_hints(props);
         }
 
         // Set adapter attribution on all proposals.
