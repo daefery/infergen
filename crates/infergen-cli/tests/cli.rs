@@ -51,13 +51,16 @@ fn scan_stub_not_implemented() {
 }
 
 #[test]
-fn generate_stub_not_implemented() {
+fn generate_empty_catalog_succeeds() {
+    let dir = tempdir().unwrap();
     infergen()
-        .arg("generate")
+        .current_dir(dir.path())
+        .args(["generate", "--output", "out.ts"])
         .assert()
         .success()
-        .stdout(contains("not yet implemented"))
-        .stdout(contains("E2.1"));
+        .stdout(contains("out.ts"));
+    let ts = std::fs::read_to_string(dir.path().join("out.ts")).unwrap();
+    assert!(ts.contains("EventName = never"), "empty catalog should have EventName = never");
 }
 
 #[test]
@@ -135,6 +138,86 @@ fn init_toml_format() {
     assert!(path.is_file());
     let contents = std::fs::read_to_string(&path).unwrap();
     assert!(contents.contains("schemaVersion"));
+}
+
+// ---------------------------------------------------------------------------
+// generate sub-command tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn generate_writes_output_file() {
+    let dir = tempdir().unwrap();
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    std::fs::write(
+        catalog_dir.join("catalog.yaml"),
+        minimal_catalog_yaml("evt_gen0000000000001", "page_viewed", "approved"),
+    ).unwrap();
+    let out = dir.path().join("sdk.ts");
+    infergen()
+        .current_dir(dir.path())
+        .args(["generate", "--output", out.to_str().unwrap()])
+        .assert()
+        .success();
+    assert!(out.exists(), "output file not created");
+    let ts = std::fs::read_to_string(&out).unwrap();
+    assert!(ts.contains("page_viewed"), "event missing from generated SDK");
+}
+
+#[test]
+fn generate_default_output_infergen_generated_ts() {
+    let dir = tempdir().unwrap();
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    std::fs::write(
+        catalog_dir.join("catalog.yaml"),
+        minimal_catalog_yaml("evt_gen0000000000002", "home_viewed", "approved"),
+    ).unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .arg("generate")
+        .assert()
+        .success();
+    let out = dir.path().join("infergen.generated.ts");
+    assert!(out.exists(), "infergen.generated.ts not created");
+}
+
+#[test]
+fn generate_reports_event_count() {
+    let dir = tempdir().unwrap();
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    // Two approved events
+    let yaml = format!(
+        "schemaVersion: 1\nevents:\n{}\n{}",
+        minimal_event_yaml("evt_gen0000000000003", "event_a", "approved"),
+        minimal_event_yaml("evt_gen0000000000004", "event_b", "approved"),
+    );
+    std::fs::write(catalog_dir.join("catalog.yaml"), &yaml).unwrap();
+    infergen()
+        .current_dir(dir.path())
+        .args(["generate", "--output", "out.ts"])
+        .assert()
+        .success()
+        .stdout(contains("2 events"));
+}
+
+/// Single-event YAML block for multi-event fixture building.
+fn minimal_event_yaml(id: &str, name: &str, status: &str) -> String {
+    format!(
+        r#"  - id: "{id}"
+    name: "{name}"
+    description: ""
+    status: {status}
+    confidence: 0.9
+    kind: pageView
+    provenance:
+      - sourcePath: "src/index.tsx"
+        adapter: "nextjs"
+    properties: []
+    providers: []
+"#
+    )
 }
 
 // ---------------------------------------------------------------------------

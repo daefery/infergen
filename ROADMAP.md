@@ -39,8 +39,8 @@ Goal: turn the approved catalog into code developers call with full type safety.
 
 | Epic No | Name | Status | Description | Note/Blocker/Dependency |
 |---|---|---|---|---|
-| E2.1 | TypeScript Codegen | Planned | Generate a typed SDK from the catalog: one strongly-typed function/key per event, property shapes enforced at compile time. Deterministic, idempotent output. | Depends on E1.1. |
-| E2.2 | Generated SDK Ergonomics | Planned | Autocomplete-friendly API, JSDoc from catalog descriptions, tree-shakeable, framework-friendly imports. | Depends on E2.1. |
+| E2.1 | TypeScript Codegen | Done | Generate a typed SDK from the catalog: one strongly-typed function/key per event, property shapes enforced at compile time. Deterministic, idempotent output. | Depends on E1.1. |
+| E2.2 | Generated SDK Ergonomics | Done | Autocomplete-friendly API, JSDoc from catalog descriptions, tree-shakeable, framework-friendly imports. | Depends on E2.1. |
 | E2.3 | Codegen Determinism & Safety | Planned | Stable output ordering, no spurious diffs, `--check` to detect stale generated code. Safe to commit or gitignore. | Depends on E2.1. |
 
 ---

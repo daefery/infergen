@@ -24,14 +24,28 @@ pub enum Commands {
     Init(InitArgs),
     /// Scan source and propose an event catalog. (Lands in E0.4.)
     Scan,
-    /// Generate a typed SDK from the catalog. (Lands in E2.1.)
-    Generate,
+    /// Generate a TypeScript SDK from the approved catalog.
+    Generate(GenerateArgs),
     /// CI check: fail on drift / untracked moments. (Lands in E4.2.)
     Check,
     /// Watch files and re-scan on change. (Lands in E4.3.)
     Watch,
     /// Review and annotate the event catalog.
     Review(ReviewArgs),
+}
+
+/// Arguments for `infergen generate`.
+#[derive(Debug, Args)]
+pub struct GenerateArgs {
+    /// Path to the catalog file.
+    #[arg(long, default_value = DEFAULT_CATALOG)]
+    pub catalog: PathBuf,
+    /// Output TypeScript file path.
+    #[arg(long, default_value = "infergen.generated.ts")]
+    pub output: PathBuf,
+    /// Also generate code for Proposed events (in addition to Approved).
+    #[arg(long)]
+    pub include_proposed: bool,
 }
 
 /// Arguments for `infergen review`.
