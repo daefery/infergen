@@ -9,6 +9,7 @@ use std::path::PathBuf;
 
 pub mod adapter;
 pub mod catalog;
+pub mod codegen;
 pub mod config;
 pub mod detect;
 pub mod linter;
@@ -20,6 +21,7 @@ pub mod review;
 pub use adapter::nextjs::NextjsAdapter;
 pub use adapter::{Adapter, EventKind, PropertyHint, ProposedEvent};
 pub use catalog::{from_proposals, load_catalog, merge_proposals, save_catalog};
+pub use codegen::{CodegenConfig, generate_typescript};
 pub use config::Config;
 pub use detect::{DetectionResult, Framework, Language, detect};
 pub use infergen_types::{
