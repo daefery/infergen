@@ -173,11 +173,13 @@ fn write_property_jsdoc(out: &mut String, prop: &EventProperty) {
 fn write_interface(out: &mut String, entry: &CatalogEntry) {
     let pascal = to_pascal_case(&entry.name);
     out.push_str(&format!("/** Properties for the {} event. */\n", entry.name));
-    if entry.properties.is_empty() {
+    let mut sorted_props: Vec<&EventProperty> = entry.properties.iter().collect();
+    sorted_props.sort_by(|a, b| a.name.cmp(&b.name));
+    if sorted_props.is_empty() {
         out.push_str(&format!("export interface {}Properties {{}}\n", pascal));
     } else {
         out.push_str(&format!("export interface {}Properties {{\n", pascal));
-        for prop in &entry.properties {
+        for prop in &sorted_props {
             write_property_jsdoc(out, prop);
             let t = ts_type(prop.prop_type.as_deref());
             out.push_str(&format!("  {}: {};\n", prop.name, t));
@@ -489,5 +491,22 @@ mod tests {
         let cat = make_catalog(vec![entry]);
         let ts = generate_typescript(&cat, &CodegenConfig::default());
         assert!(ts.contains("mystery: unknown;"), "output:\n{ts}");
+    }
+
+    #[test]
+    fn generate_properties_sorted_alphabetically() {
+        let mut entry = make_entry("api_called", EventStatus::Approved);
+        entry.properties.push(make_prop("zebra", Some("string"), false));
+        entry.properties.push(make_prop("alpha", Some("string"), false));
+        entry.properties.push(make_prop("mango", Some("string"), false));
+        let cat = make_catalog(vec![entry]);
+        let ts = generate_typescript(&cat, &CodegenConfig::default());
+        let alpha_pos = ts.find("alpha: string").unwrap();
+        let mango_pos = ts.find("mango: string").unwrap();
+        let zebra_pos = ts.find("zebra: string").unwrap();
+        assert!(
+            alpha_pos < mango_pos && mango_pos < zebra_pos,
+            "properties not sorted: alpha={alpha_pos} mango={mango_pos} zebra={zebra_pos}\noutput:\n{ts}"
+        );
     }
 }

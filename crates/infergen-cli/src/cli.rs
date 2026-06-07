@@ -46,6 +46,9 @@ pub struct GenerateArgs {
     /// Also generate code for Proposed events (in addition to Approved).
     #[arg(long)]
     pub include_proposed: bool,
+    /// Check whether the output file is up to date; exit non-zero if stale. Does not write.
+    #[arg(long)]
+    pub check: bool,
 }
 
 /// Arguments for `infergen review`.

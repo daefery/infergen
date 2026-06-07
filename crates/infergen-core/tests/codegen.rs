@@ -140,6 +140,23 @@ fn full_pipeline_output_contains_no_current_year() {
 }
 
 #[test]
+fn full_pipeline_properties_sorted_alphabetically() {
+    let mut entry = make_entry("api_called", EventStatus::Approved);
+    entry.properties.push(make_prop("zebra", Some("string"), false));
+    entry.properties.push(make_prop("alpha", Some("string"), false));
+    entry.properties.push(make_prop("mango", Some("string"), false));
+    let cat = make_catalog(vec![entry]);
+    let ts = generate_typescript(&cat, &CodegenConfig::default());
+    let alpha_pos = ts.find("alpha: string").unwrap();
+    let mango_pos = ts.find("mango: string").unwrap();
+    let zebra_pos = ts.find("zebra: string").unwrap();
+    assert!(
+        alpha_pos < mango_pos && mango_pos < zebra_pos,
+        "properties not sorted: alpha={alpha_pos} mango={mango_pos} zebra={zebra_pos}"
+    );
+}
+
+#[test]
 fn full_pipeline_approve_then_generate() {
     // Simulate the user journey: scan → approve → generate
     let mut cat = make_catalog(vec![
