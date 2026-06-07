@@ -66,7 +66,7 @@ Goal: keep catalog and code in sync forever; enforce in CI.
 | Epic No | Name | Status | Description | Note/Blocker/Dependency |
 |---|---|---|---|---|
 | E4.1 | Incremental Re-scan & Merge | Done | Re-scan merges new proposals without clobbering manual edits. Three-way merge keyed on stable IDs. Hardest correctness problem. | Depends on E1.1, E1.5. |
-| E4.2 | Drift Detection (`scan --check`) | Planned | CI mode: fail build on untracked moments, convention violations, stale generated code, or catalog drift. | Depends on E4.1, E2.3. |
+| E4.2 | Drift Detection (`scan --check`) | Done | CI mode: fail build on untracked moments, convention violations, stale generated code, or catalog drift. | Depends on E4.1, E2.3. |
 | E4.3 | Watch Mode | Planned | Local file-watch → live re-scan + regenerate during development. | Depends on E4.1. |
 | E4.4 | CI/CD Integrations | Planned | GitHub Action + GitLab/CircleCI recipes. PR comment summarizing new/changed events. | Depends on E4.2. |
 
