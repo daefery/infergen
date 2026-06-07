@@ -8,15 +8,20 @@
 use std::path::PathBuf;
 
 pub mod adapter;
+pub mod catalog;
 pub mod config;
 pub mod detect;
 pub mod parser;
 
 pub use adapter::nextjs::NextjsAdapter;
 pub use adapter::{Adapter, EventKind, PropertyHint, ProposedEvent};
+pub use catalog::{from_proposals, load_catalog, merge_proposals, save_catalog};
 pub use config::Config;
 pub use detect::{DetectionResult, Framework, Language, detect};
-pub use infergen_types::CATALOG_SCHEMA_VERSION;
+pub use infergen_types::{
+    Catalog, CatalogEntry, CatalogEventKind, EventProperty, EventProvenance, EventStatus,
+    CATALOG_SCHEMA_VERSION,
+};
 pub use parser::js::JsParser;
 pub use parser::{Diagnostic, LanguageParser, ParsedFile};
 
@@ -70,6 +75,15 @@ pub enum Error {
         /// Path with the unsupported extension.
         path: PathBuf,
     },
+
+    /// A catalog file could not be parsed or serialized.
+    #[error("failed to parse catalog at {}: {message}", path.display())]
+    CatalogParse {
+        /// Path of the offending catalog file.
+        path: PathBuf,
+        /// Human-readable parse/serialize error message.
+        message: String,
+    },
 }
 
 /// Convenience result type for scan-engine fallible operations.
@@ -112,5 +126,15 @@ mod tests {
             path: PathBuf::from("a.json"),
         };
         assert!(e.to_string().contains("--force"));
+    }
+
+    #[test]
+    fn catalog_parse_error_formats() {
+        let e = Error::CatalogParse {
+            path: PathBuf::from("catalog.yaml"),
+            message: "unexpected key".into(),
+        };
+        assert!(e.to_string().contains("catalog.yaml"));
+        assert!(e.to_string().contains("unexpected key"));
     }
 }
