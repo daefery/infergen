@@ -267,6 +267,36 @@ fn generate_check_does_not_write_file() {
     assert_eq!(contents, sentinel, "--check must not overwrite the file");
 }
 
+// ---------------------------------------------------------------------------
+// E3.3 Delivery Engine CLI tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn generate_output_contains_delivery_engine() {
+    let dir = tempdir().unwrap();
+    let out = dir.path().join("sdk.ts");
+    infergen()
+        .current_dir(dir.path())
+        .args(["generate", "--output", out.to_str().unwrap()])
+        .assert()
+        .success();
+    let ts = std::fs::read_to_string(&out).unwrap();
+    assert!(ts.contains("DeliveryEngine"), "DeliveryEngine missing from generated SDK");
+}
+
+#[test]
+fn generate_output_contains_with_delivery() {
+    let dir = tempdir().unwrap();
+    let out = dir.path().join("sdk.ts");
+    infergen()
+        .current_dir(dir.path())
+        .args(["generate", "--output", out.to_str().unwrap()])
+        .assert()
+        .success();
+    let ts = std::fs::read_to_string(&out).unwrap();
+    assert!(ts.contains("withDelivery"), "withDelivery missing from generated SDK");
+}
+
 /// Single-event YAML block for multi-event fixture building.
 fn minimal_event_yaml(id: &str, name: &str, status: &str) -> String {
     format!(

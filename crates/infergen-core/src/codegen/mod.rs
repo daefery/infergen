@@ -1,9 +1,13 @@
-//! TypeScript code generation from an approved event catalog (E2.1 + E2.2).
+//! TypeScript code generation from an approved event catalog (E2.1 + E2.2 + E3.3).
 //!
 //! `generate_typescript` produces a deterministic, idempotent TypeScript source
 //! file: one typed interface + one named function per approved event, a `track`
 //! namespace object for autocomplete-friendly use, and `EventName` union type.
 //! JSDoc comments carry event descriptions and `@pii` tags on sensitive props.
+//! E3.3 adds `DeliveryEngine` + `withDelivery` to every generated file.
+
+mod delivery;
+use delivery::write_delivery_engine;
 
 use infergen_types::{CatalogEntry, EventProperty, EventStatus};
 
@@ -53,6 +57,7 @@ pub fn generate_typescript(catalog: &Catalog, config: &CodegenConfig) -> String 
     let mut out = String::new();
     write_header(&mut out);
     write_runtime_preamble(&mut out);
+    write_delivery_engine(&mut out);
     out.push_str(&build_event_name_type(&events));
 
     for entry in &events {
