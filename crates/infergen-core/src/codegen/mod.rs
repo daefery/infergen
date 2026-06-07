@@ -6,7 +6,9 @@
 //! JSDoc comments carry event descriptions and `@pii` tags on sensitive props.
 //! E3.3 adds `DeliveryEngine` + `withDelivery` to every generated file.
 
+mod consent;
 mod delivery;
+use consent::write_consent_module;
 use delivery::write_delivery_engine;
 
 use infergen_types::{CatalogEntry, EventProperty, EventStatus};
@@ -58,6 +60,7 @@ pub fn generate_typescript(catalog: &Catalog, config: &CodegenConfig) -> String 
     write_header(&mut out);
     write_runtime_preamble(&mut out);
     write_delivery_engine(&mut out);
+    write_consent_module(&mut out);
     out.push_str(&build_event_name_type(&events));
 
     for entry in &events {
@@ -145,6 +148,12 @@ fn write_runtime_preamble(out: &mut String) {
     out.push_str("export interface InfergenConfig {\n");
     out.push_str("  /** Analytics providers that receive every `track` call. */\n");
     out.push_str("  providers: Provider[];\n");
+    out.push_str("  /** Initial consent state. Default: \"unknown\" (permissive until explicitly set). */\n");
+    out.push_str("  consent?: ConsentState;\n");
+    out.push_str("  /** Initial region tag for provider routing (e.g. \"eu\", \"us\"). */\n");
+    out.push_str("  region?: string;\n");
+    out.push_str("  /** Initial per-property redaction hook. */\n");
+    out.push_str("  redactFn?: RedactFn;\n");
     out.push_str("}\n");
     out.push('\n');
     out.push_str("/** @internal Registered providers — populated by `configureInfergen`. */\n");
@@ -153,6 +162,9 @@ fn write_runtime_preamble(out: &mut String) {
     out.push_str("/** Configure the Infergen runtime. Call once before any track calls. */\n");
     out.push_str("export function configureInfergen(config: InfergenConfig): void {\n");
     out.push_str("  _providers = config.providers;\n");
+    out.push_str("  if (config.consent !== undefined) setConsent(config.consent);\n");
+    out.push_str("  if (config.region !== undefined) setRegion(config.region);\n");
+    out.push_str("  if (config.redactFn !== undefined) setRedactFn(config.redactFn);\n");
     out.push_str("}\n");
 }
 
@@ -239,7 +251,7 @@ fn write_function(out: &mut String, entry: &CatalogEntry) {
         "export function track{pascal}(properties: {pascal}Properties): void {{\n"
     ));
     out.push_str(&format!(
-        "  _providers.forEach(p => p.track(\"{}\", properties));\n",
+        "  _dispatch(\"{}\", properties);\n",
         entry.name
     ));
     out.push_str("}\n");
@@ -563,9 +575,89 @@ mod tests {
         let cat = make_catalog(vec![make_entry("page_viewed", EventStatus::Approved)]);
         let ts = generate_typescript(&cat, &CodegenConfig::default());
         assert!(
-            ts.contains("_providers.forEach(p => p.track(\"page_viewed\", properties))"),
+            ts.contains("_dispatch(\"page_viewed\", properties)"),
             "dispatch call missing\noutput:\n{ts}"
         );
+    }
+
+    #[test]
+    fn generate_has_set_consent() {
+        let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+        assert!(ts.contains("export function setConsent"), "setConsent missing");
+    }
+
+    #[test]
+    fn generate_has_opt_out() {
+        let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+        assert!(ts.contains("export function optOut"), "optOut missing");
+    }
+
+    #[test]
+    fn generate_has_opt_in() {
+        let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+        assert!(ts.contains("export function optIn"), "optIn missing");
+    }
+
+    #[test]
+    fn generate_has_set_region() {
+        let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+        assert!(ts.contains("export function setRegion"), "setRegion missing");
+    }
+
+    #[test]
+    fn generate_has_set_redact_fn() {
+        let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+        assert!(ts.contains("export function setRedactFn"), "setRedactFn missing");
+    }
+
+    #[test]
+    fn generate_has_dispatch() {
+        let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+        assert!(ts.contains("export function _dispatch"), "_dispatch missing");
+    }
+
+    #[test]
+    fn generate_track_fn_uses_dispatch() {
+        let cat = make_catalog(vec![make_entry("user_signed_in", EventStatus::Approved)]);
+        let ts = generate_typescript(&cat, &CodegenConfig::default());
+        assert!(ts.contains("_dispatch("), "track fn must use _dispatch");
+        assert!(!ts.contains("_providers.forEach"), "_providers.forEach must not appear");
+    }
+
+    #[test]
+    fn generate_infergen_config_has_consent_field() {
+        let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+        assert!(ts.contains("consent?: ConsentState"), "consent field missing");
+    }
+
+    #[test]
+    fn generate_infergen_config_has_region_field() {
+        let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+        assert!(ts.contains("region?: string"), "region field missing");
+    }
+
+    #[test]
+    fn generate_infergen_config_has_redact_fn_field() {
+        let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+        assert!(ts.contains("redactFn?: RedactFn"), "redactFn field missing");
+    }
+
+    #[test]
+    fn generate_configure_infergen_calls_set_consent() {
+        let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+        assert!(ts.contains("setConsent(config.consent)"), "setConsent call missing");
+    }
+
+    #[test]
+    fn generate_configure_infergen_calls_set_region() {
+        let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+        assert!(ts.contains("setRegion(config.region)"), "setRegion call missing");
+    }
+
+    #[test]
+    fn generate_configure_infergen_calls_set_redact_fn() {
+        let ts = generate_typescript(&Catalog::default(), &CodegenConfig::default());
+        assert!(ts.contains("setRedactFn(config.redactFn)"), "setRedactFn call missing");
     }
 
     #[test]
