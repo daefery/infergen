@@ -350,6 +350,7 @@ fn make_catalog_entry(id: &str, name: &str, status: EventStatus) -> CatalogEntry
         }],
         properties: Vec::new(),
         providers: Vec::new(),
+        package: None,
     }
 }
 

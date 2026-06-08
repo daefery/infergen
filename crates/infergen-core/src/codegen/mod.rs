@@ -331,6 +331,7 @@ mod tests {
             }],
             properties: Vec::new(),
             providers: Vec::new(),
+            package: None,
         }
     }
 

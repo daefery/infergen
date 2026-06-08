@@ -116,6 +116,14 @@ pub struct CatalogEntry {
     /// post-E3.1 when the user adds providers.
     #[serde(default)]
     pub providers: Vec<String>,
+    /// Package namespace in a monorepo, e.g. `"frontend"`.
+    ///
+    /// `None` in single-package projects. Set by
+    /// `infergen_core::monorepo::namespace_catalog` when merging per-package
+    /// catalogs. Omitted from serialized YAML when `None` so existing
+    /// single-package catalog files are unaffected.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub package: Option<String>,
 }
 
 /// Top-level catalog document — the contents of `.infergen/catalog.yaml`.
@@ -193,8 +201,64 @@ mod tests {
             provenance: Vec::new(),
             properties: Vec::new(),
             providers: Vec::new(),
+            package: None,
         };
         assert!(entry.description.is_empty());
+    }
+
+    fn make_entry(name: &str) -> CatalogEntry {
+        CatalogEntry {
+            id: format!("evt_{name}"),
+            name: name.into(),
+            description: String::new(),
+            status: EventStatus::Proposed,
+            confidence: 0.9,
+            kind: CatalogEventKind::PageView,
+            provenance: Vec::new(),
+            properties: Vec::new(),
+            providers: Vec::new(),
+            package: None,
+        }
+    }
+
+    #[test]
+    fn catalog_entry_package_defaults_none() {
+        let entry = make_entry("page_viewed");
+        assert!(entry.package.is_none());
+    }
+
+    #[test]
+    fn catalog_entry_package_some_roundtrips_yaml() {
+        let mut entry = make_entry("user_signed_in");
+        entry.package = Some("frontend".into());
+        let catalog = Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: vec![entry] };
+        let yaml = serde_yaml::to_string(&catalog).unwrap();
+        let back: Catalog = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(back.events[0].package, Some("frontend".into()));
+    }
+
+    #[test]
+    fn catalog_entry_without_package_yaml_omits_field() {
+        let entry = make_entry("api_called");
+        let catalog = Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: vec![entry] };
+        let yaml = serde_yaml::to_string(&catalog).unwrap();
+        assert!(!yaml.contains("package:"), "package field should not appear when None");
+    }
+
+    #[test]
+    fn catalog_entry_existing_yaml_deserializes_without_package() {
+        let yaml = r#"schemaVersion: 1
+events:
+  - id: evt_abc
+    name: page_viewed
+    description: ""
+    status: proposed
+    confidence: 0.9
+    kind: pageView
+    provenance: []
+"#;
+        let catalog: Catalog = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(catalog.events[0].package, None);
     }
 
     #[test]
