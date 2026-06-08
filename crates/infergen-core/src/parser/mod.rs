@@ -13,6 +13,8 @@ pub mod go;
 pub mod js;
 pub mod py;
 pub mod ruby;
+pub mod svelte;
+pub mod vue;
 
 /// A non-fatal diagnostic emitted during parsing (syntax error or warning).
 ///
@@ -123,6 +125,38 @@ impl ParsedFile {
             f(&stmts)
         } else {
             R::default()
+        }
+    }
+
+    /// Call `f` with the raw Vue SFC source text.
+    ///
+    /// Returns `None` when [`self.lang`][ParsedFile::lang] is not
+    /// [`Language::Vue`].
+    #[must_use]
+    pub fn with_vue_source<F, R>(&self, f: F) -> Option<R>
+    where
+        F: FnOnce(&str) -> R,
+    {
+        if self.lang == Language::Vue {
+            Some(f(&self.source))
+        } else {
+            None
+        }
+    }
+
+    /// Call `f` with the raw Svelte component source text.
+    ///
+    /// Returns `None` when [`self.lang`][ParsedFile::lang] is not
+    /// [`Language::Svelte`].
+    #[must_use]
+    pub fn with_svelte_source<F, R>(&self, f: F) -> Option<R>
+    where
+        F: FnOnce(&str) -> R,
+    {
+        if self.lang == Language::Svelte {
+            Some(f(&self.source))
+        } else {
+            None
         }
     }
 }
@@ -255,6 +289,52 @@ mod tests {
             diagnostics: vec![],
         };
         assert!(f.with_go_source(|_| ()).is_none());
+    }
+
+    #[test]
+    fn with_vue_source_some_for_vue() {
+        let f = ParsedFile {
+            path: PathBuf::from("comp.vue"),
+            lang: Language::Vue,
+            source: "<template>hello</template>".to_owned(),
+            diagnostics: vec![],
+        };
+        let len = f.with_vue_source(|s| s.len());
+        assert_eq!(len, Some("<template>hello</template>".len()));
+    }
+
+    #[test]
+    fn with_vue_source_none_for_typescript() {
+        let f = ParsedFile {
+            path: PathBuf::from("app.ts"),
+            lang: Language::TypeScript,
+            source: "const x = 1;".to_owned(),
+            diagnostics: vec![],
+        };
+        assert!(f.with_vue_source(|_| ()).is_none());
+    }
+
+    #[test]
+    fn with_svelte_source_some_for_svelte() {
+        let f = ParsedFile {
+            path: PathBuf::from("+page.svelte"),
+            lang: Language::Svelte,
+            source: "<h1>Home</h1>".to_owned(),
+            diagnostics: vec![],
+        };
+        let len = f.with_svelte_source(|s| s.len());
+        assert_eq!(len, Some("<h1>Home</h1>".len()));
+    }
+
+    #[test]
+    fn with_svelte_source_none_for_python() {
+        let f = ParsedFile {
+            path: PathBuf::from("views.py"),
+            lang: Language::Python,
+            source: "pass".to_owned(),
+            diagnostics: vec![],
+        };
+        assert!(f.with_svelte_source(|_| ()).is_none());
     }
 
     /// Verify the trait is object-safe so it can be used as `dyn LanguageParser`.

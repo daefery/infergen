@@ -11,12 +11,17 @@ use crate::{detect::Framework, parser::ParsedFile};
 
 pub mod django;
 pub mod echo;
+pub mod express;
 pub mod fastapi;
 pub mod flask;
 pub mod gin;
+pub mod nestjs;
 pub mod nethttp;
 pub mod nextjs;
 pub mod rails;
+pub mod react_router;
+pub mod svelte_kit;
+pub mod vue;
 
 /// Broad category of a proposed tracking moment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
