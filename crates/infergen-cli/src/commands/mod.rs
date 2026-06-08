@@ -3,6 +3,7 @@
 pub mod check;
 pub mod generate;
 pub mod init;
+pub mod manifest;
 pub mod review;
 pub mod scan;
 pub mod watch;
@@ -18,5 +19,6 @@ pub fn run(command: Commands) -> anyhow::Result<()> {
         Commands::Check(args) => check::run(args),
         Commands::Watch(args) => watch::run(args),
         Commands::Review(args) => review::run(args),
+        Commands::Manifest(args) => manifest::run(args),
     }
 }
