@@ -3,8 +3,11 @@
 pub mod check;
 pub mod generate;
 pub mod init;
+pub mod manifest;
+pub mod plugin;
 pub mod review;
 pub mod scan;
+pub mod view;
 pub mod watch;
 
 use crate::cli::Commands;
@@ -18,5 +21,8 @@ pub fn run(command: Commands) -> anyhow::Result<()> {
         Commands::Check(args) => check::run(args),
         Commands::Watch(args) => watch::run(args),
         Commands::Review(args) => review::run(args),
+        Commands::View(args) => view::run(args),
+        Commands::Plugin(args) => plugin::run(args),
+        Commands::Manifest(args) => manifest::run(args),
     }
 }
