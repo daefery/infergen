@@ -149,6 +149,19 @@ pub fn approve(catalog: &mut Catalog, id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Approve every event currently in `Proposed` status. Returns the number of
+/// events transitioned. Already-approved or ignored events are left untouched.
+pub fn approve_all_proposed(catalog: &mut Catalog) -> usize {
+    let mut count = 0;
+    for entry in &mut catalog.events {
+        if entry.status == EventStatus::Proposed {
+            entry.status = EventStatus::Approved;
+            count += 1;
+        }
+    }
+    count
+}
+
 /// Set the entry's status to `Ignored`.
 ///
 /// # Errors

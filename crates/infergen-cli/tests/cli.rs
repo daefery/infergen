@@ -911,3 +911,74 @@ fn review_unknown_id_exits_nonzero() {
         .assert()
         .failure();
 }
+
+#[test]
+fn review_approve_all_approves_every_proposed() {
+    let dir = tempdir().unwrap();
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    let catalog = r#"schemaVersion: 1
+events:
+  - id: "evt_prop000000000a"
+    name: "home_page_viewed"
+    description: ""
+    status: proposed
+    confidence: 0.9
+    kind: pageView
+    provenance:
+      - sourcePath: "src/app/page.tsx"
+        adapter: "nextjs"
+    properties: []
+    providers: []
+  - id: "evt_prop000000000b"
+    name: "save_clicked"
+    description: ""
+    status: proposed
+    confidence: 0.6
+    kind: buttonClick
+    provenance:
+      - sourcePath: "src/app/edit.tsx"
+        adapter: "nextjs"
+    properties: []
+    providers: []
+  - id: "evt_ign0000000000c"
+    name: "noise_clicked"
+    description: ""
+    status: ignored
+    confidence: 0.5
+    kind: buttonClick
+    provenance:
+      - sourcePath: "src/app/x.tsx"
+        adapter: "nextjs"
+    properties: []
+    providers: []
+"#;
+    let catalog_path = catalog_dir.join("catalog.yaml");
+    std::fs::write(&catalog_path, catalog).unwrap();
+
+    infergen()
+        .current_dir(dir.path())
+        .args(["review", "approve", "--all"])
+        .assert()
+        .success()
+        .stdout(contains("2 proposed event(s) → approved"));
+
+    let after = std::fs::read_to_string(&catalog_path).unwrap();
+    // Both proposed events are now approved; the ignored event is untouched.
+    assert!(!after.contains("status: proposed"), "no proposed events should remain");
+    assert!(after.contains("status: ignored"), "ignored event must stay ignored");
+}
+
+#[test]
+fn review_approve_without_id_or_all_fails() {
+    let dir = tempdir().unwrap();
+    let catalog_dir = dir.path().join(".infergen");
+    std::fs::create_dir_all(&catalog_dir).unwrap();
+    std::fs::write(catalog_dir.join("catalog.yaml"), "schemaVersion: 1\nevents: []\n").unwrap();
+
+    infergen()
+        .current_dir(dir.path())
+        .args(["review", "approve"])
+        .assert()
+        .failure();
+}

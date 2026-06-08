@@ -41,6 +41,8 @@ fn event_kind_to_catalog(kind: EventKind) -> CatalogEventKind {
         EventKind::ApiCall => CatalogEventKind::ApiCall,
         EventKind::AuthEvent => CatalogEventKind::AuthEvent,
         EventKind::FormSubmit => CatalogEventKind::FormSubmit,
+        EventKind::ButtonClick => CatalogEventKind::ButtonClick,
+        EventKind::Search => CatalogEventKind::Search,
         EventKind::Error => CatalogEventKind::Error,
     }
 }
@@ -51,6 +53,8 @@ fn kind_to_str(kind: EventKind) -> &'static str {
         EventKind::ApiCall => "apiCall",
         EventKind::AuthEvent => "authEvent",
         EventKind::FormSubmit => "formSubmit",
+        EventKind::ButtonClick => "buttonClick",
+        EventKind::Search => "search",
         EventKind::Error => "error",
     }
 }

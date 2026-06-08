@@ -22,6 +22,10 @@ pub enum EventKind {
     AuthEvent,
     /// A form was submitted.
     FormSubmit,
+    /// A button or clickable element was clicked.
+    ButtonClick,
+    /// A search query was issued (search input / search handler).
+    Search,
     /// An unhandled error or error boundary triggered.
     Error,
 }

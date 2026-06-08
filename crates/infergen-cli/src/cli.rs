@@ -94,10 +94,13 @@ pub enum ReviewAction {
         #[arg(long, default_value = "all")]
         status: String,
     },
-    /// Approve an event by stable ID.
+    /// Approve an event by stable ID, or every proposed event with `--all`.
     Approve {
-        /// Stable event ID (e.g. `evt_0123456789abcdef`).
-        id: String,
+        /// Stable event ID (e.g. `evt_0123456789abcdef`). Omit when using `--all`.
+        id: Option<String>,
+        /// Approve all events currently in `proposed` status.
+        #[arg(long, conflicts_with = "id")]
+        all: bool,
     },
     /// Ignore an event by stable ID (mark as false positive).
     Ignore {

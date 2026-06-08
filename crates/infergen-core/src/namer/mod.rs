@@ -26,6 +26,10 @@ const ACTION_WORDS: &[&str] = &[
     "viewed",
     "load",
     "loaded",
+    "search",
+    "searched",
+    "button",
+    "btn",
     "error",
     "errored",
     "page",
@@ -156,6 +160,8 @@ impl Namer {
             EventKind::FormSubmit => "form",
             EventKind::AuthEvent => "user",
             EventKind::ApiCall => "api",
+            EventKind::ButtonClick => "button",
+            EventKind::Search => "search",
             EventKind::Error => "error",
         };
         (fallback.to_owned(), 0.5)
@@ -179,6 +185,8 @@ impl Namer {
             EventKind::FormSubmit => "submitted",
             EventKind::AuthEvent => "triggered",
             EventKind::ApiCall => "api_called",
+            EventKind::ButtonClick => "clicked",
+            EventKind::Search => "searched",
             EventKind::Error => "errored",
         };
         (action.to_owned(), 0.75)
@@ -303,6 +311,9 @@ fn detect_action_from_tokens(tokens: &[&str], kind: EventKind) -> Option<String>
     }
     if tokens.contains(&"click") {
         return Some("clicked".to_owned());
+    }
+    if tokens.contains(&"search") {
+        return Some("searched".to_owned());
     }
     if tokens.contains(&"load") {
         return Some("loaded".to_owned());
