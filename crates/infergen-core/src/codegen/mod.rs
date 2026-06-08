@@ -223,7 +223,11 @@ fn write_interface(out: &mut String, entry: &CatalogEntry) {
     let mut sorted_props: Vec<&EventProperty> = entry.properties.iter().collect();
     sorted_props.sort_by(|a, b| a.name.cmp(&b.name));
     if sorted_props.is_empty() {
-        out.push_str(&format!("export interface {}Properties {{}}\n", pascal));
+        // `Record<string, never>` is the lint-clean empty-object type; an empty
+        // `interface {}` trips @typescript-eslint/no-empty-object-type.
+        out.push_str(&format!(
+            "export type {pascal}Properties = Record<string, never>;\n"
+        ));
     } else {
         out.push_str(&format!("export interface {}Properties {{\n", pascal));
         for prop in &sorted_props {
@@ -511,10 +515,15 @@ mod tests {
     }
 
     #[test]
-    fn generate_empty_interface_for_no_props() {
+    fn generate_empty_props_uses_record_never() {
         let cat = make_catalog(vec![make_entry("click_happened", EventStatus::Approved)]);
         let ts = generate_typescript(&cat, &CodegenConfig::default());
-        assert!(ts.contains("ClickHappenedProperties {}"), "output:\n{ts}");
+        assert!(
+            ts.contains("export type ClickHappenedProperties = Record<string, never>;"),
+            "output:\n{ts}"
+        );
+        // Must not emit a lint-tripping empty interface.
+        assert!(!ts.contains("ClickHappenedProperties {}"), "output:\n{ts}");
     }
 
     #[test]

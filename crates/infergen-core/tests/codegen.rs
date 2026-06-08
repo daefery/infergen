@@ -110,10 +110,13 @@ fn full_pipeline_include_proposed_flag() {
 }
 
 #[test]
-fn full_pipeline_empty_properties_interface() {
+fn full_pipeline_empty_properties_uses_record_never() {
     let cat = make_catalog(vec![make_entry("click_happened", EventStatus::Approved)]);
     let ts = generate_typescript(&cat, &CodegenConfig::default());
-    assert!(ts.contains("ClickHappenedProperties {}"), "empty interface missing");
+    assert!(
+        ts.contains("export type ClickHappenedProperties = Record<string, never>;"),
+        "empty-props type missing"
+    );
 }
 
 #[test]
