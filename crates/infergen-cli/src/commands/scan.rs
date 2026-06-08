@@ -3,9 +3,10 @@
 use std::path::{Path, PathBuf};
 
 use infergen_core::{
-    Config, DjangoAdapter, FastApiAdapter, FlaskAdapter, JsParser, NextjsAdapter, PyParser,
+    Config, DjangoAdapter, FastApiAdapter, FlaskAdapter, FlowDetector, JsParser, NextjsAdapter,
+    PyParser,
     adapter::Adapter,
-    catalog::{from_proposals, load_catalog, rescan_merge, save_catalog},
+    catalog::{assign_flows, from_proposals, load_catalog, rescan_merge, save_catalog},
     detect::{Framework, Language, detect},
     parser::LanguageParser,
 };
@@ -125,6 +126,22 @@ pub fn run() -> anyhow::Result<()> {
         }
     }
 
+    // E6.2 — detect multi-step funnels across all proposals.
+    let flow_detector = FlowDetector::new();
+    let detected_flows = flow_detector.detect(&all_proposals);
+    if !detected_flows.is_empty() {
+        println!("scan: {} flow(s) detected", detected_flows.len());
+        for f in &detected_flows {
+            println!(
+                "  [{kind}] {name} ({steps} steps, {conf:.0}% confidence)",
+                kind = format!("{:?}", f.kind).to_lowercase(),
+                name = f.name,
+                steps = f.steps.len(),
+                conf = f64::from(f.confidence) * 100.0,
+            );
+        }
+    }
+
     let catalog_path = cwd.join(&config.catalog);
 
     match load_catalog(&catalog_path) {
@@ -148,12 +165,22 @@ pub fn run() -> anyhow::Result<()> {
             println!("  {matched_count} events matched (edits preserved)");
 
             save_catalog(&merged, &catalog_path)?;
+            if !detected_flows.is_empty() {
+                let mut cat = load_catalog(&catalog_path)?;
+                assign_flows(&mut cat, &detected_flows, &all_proposals, &cwd);
+                save_catalog(&cat, &catalog_path)?;
+            }
         }
         Err(infergen_core::Error::Io(_)) => {
             // No catalog yet — fresh scan.
             let cat = from_proposals(&all_proposals, &cwd);
             println!("  {} events proposed", cat.events.len());
             save_catalog(&cat, &catalog_path)?;
+            if !detected_flows.is_empty() {
+                let mut cat = load_catalog(&catalog_path)?;
+                assign_flows(&mut cat, &detected_flows, &all_proposals, &cwd);
+                save_catalog(&cat, &catalog_path)?;
+            }
         }
         Err(e) => return Err(e.into()),
     }

@@ -420,6 +420,7 @@ mod tests {
                 adapter: "nextjs".into(),
             }],
             package: None,
+            flow_ids: Vec::new(),
         }
     }
 
@@ -427,6 +428,7 @@ mod tests {
         Catalog {
             schema_version: 1,
             events: entries,
+            flows: Vec::new(),
         }
     }
 

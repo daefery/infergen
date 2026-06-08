@@ -157,7 +157,7 @@ fn load_catalog_or_empty(path: &Path) -> anyhow::Result<Catalog> {
     if path.exists() {
         load_catalog(path).with_context(|| format!("reading catalog {}", path.display()))
     } else {
-        Ok(Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: Vec::new() })
+        Ok(Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: Vec::new(), flows: Vec::new() })
     }
 }
 

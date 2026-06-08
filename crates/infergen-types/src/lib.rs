@@ -12,6 +12,61 @@ use serde::{Deserialize, Serialize};
 /// Bump on any breaking change to the catalog format.
 pub const CATALOG_SCHEMA_VERSION: u32 = 1;
 
+// ---------------------------------------------------------------------------
+// Flow domain types (E6.2)
+// ---------------------------------------------------------------------------
+
+/// Category of a detected multi-step funnel.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FlowKind {
+    /// E-commerce purchase funnel (cart → shipping → payment → confirmation).
+    Checkout,
+    /// New-user setup sequence (welcome → profile → invite → done).
+    Onboarding,
+    /// Authentication flow (login/signup/verify).
+    Auth,
+    /// Subscription or billing flow (plan → payment → confirmation).
+    Payment,
+    /// Search experience (query → results → refinement → selection).
+    Search,
+    /// Any other detected funnel not matching a known template.
+    Custom,
+}
+
+/// One step in a detected event flow.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlowStep {
+    /// ID of the catalog event at this step.
+    pub event_id: String,
+    /// Zero-based ordering index within the flow.
+    pub step_index: u32,
+    /// True when this step can be skipped (e.g. optional onboarding screen).
+    #[serde(default)]
+    pub optional: bool,
+}
+
+/// A detected multi-step funnel in the catalog.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventFlow {
+    /// Stable ID: `flow_{016hex}` (FNV-1a over `"{name}:{kind}"`).
+    pub id: String,
+    /// Human-readable funnel name, e.g. `"checkout"`.
+    pub name: String,
+    /// Category of this funnel.
+    pub kind: FlowKind,
+    /// Optional description. Empty until reviewer fills it in.
+    #[serde(default)]
+    pub description: String,
+    /// Ordered steps. May be reordered or amended by the reviewer.
+    pub steps: Vec<FlowStep>,
+    /// Detection confidence, `0.0`–`1.0`. Pattern match = 0.85; route
+    /// grouping = 0.75; name-prefix only = 0.60.
+    pub confidence: f64,
+}
+
 /// The version string of this crate, sourced from Cargo at compile time.
 #[must_use]
 pub fn version() -> &'static str {
@@ -124,6 +179,12 @@ pub struct CatalogEntry {
     /// single-package catalog files are unaffected.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub package: Option<String>,
+    /// IDs of flows this event participates in (back-reference, derived).
+    ///
+    /// Populated by `infergen_core::catalog::assign_flows` (E6.2). Omitted from
+    /// YAML when empty so existing catalog files are unaffected.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub flow_ids: Vec<String>,
 }
 
 /// Top-level catalog document — the contents of `.infergen/catalog.yaml`.
@@ -135,6 +196,12 @@ pub struct Catalog {
     pub schema_version: u32,
     /// All event entries, sorted by `id` for stable diffs.
     pub events: Vec<CatalogEntry>,
+    /// Detected event flows (funnels). Empty in single-event projects.
+    ///
+    /// Populated by `infergen_core::catalog::assign_flows` (E6.2). Omitted
+    /// from YAML when empty for backward compatibility.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub flows: Vec<EventFlow>,
 }
 
 impl Default for Catalog {
@@ -142,6 +209,7 @@ impl Default for Catalog {
         Catalog {
             schema_version: CATALOG_SCHEMA_VERSION,
             events: Vec::new(),
+            flows: Vec::new(),
         }
     }
 }
@@ -202,6 +270,7 @@ mod tests {
             properties: Vec::new(),
             providers: Vec::new(),
             package: None,
+            flow_ids: Vec::new(),
         };
         assert!(entry.description.is_empty());
     }
@@ -218,6 +287,7 @@ mod tests {
             properties: Vec::new(),
             providers: Vec::new(),
             package: None,
+            flow_ids: Vec::new(),
         }
     }
 
@@ -231,7 +301,7 @@ mod tests {
     fn catalog_entry_package_some_roundtrips_yaml() {
         let mut entry = make_entry("user_signed_in");
         entry.package = Some("frontend".into());
-        let catalog = Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: vec![entry] };
+        let catalog = Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: vec![entry], flows: vec![] };
         let yaml = serde_yaml::to_string(&catalog).unwrap();
         let back: Catalog = serde_yaml::from_str(&yaml).unwrap();
         assert_eq!(back.events[0].package, Some("frontend".into()));
@@ -240,7 +310,7 @@ mod tests {
     #[test]
     fn catalog_entry_without_package_yaml_omits_field() {
         let entry = make_entry("api_called");
-        let catalog = Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: vec![entry] };
+        let catalog = Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: vec![entry], flows: vec![] };
         let yaml = serde_yaml::to_string(&catalog).unwrap();
         assert!(!yaml.contains("package:"), "package field should not appear when None");
     }
@@ -271,5 +341,94 @@ events:
     fn catalog_event_kind_variants_are_distinct() {
         assert_ne!(CatalogEventKind::PageView, CatalogEventKind::ApiCall);
         assert_ne!(CatalogEventKind::AuthEvent, CatalogEventKind::FormSubmit);
+    }
+
+    // --- E6.2 flow type tests ---
+
+    #[test]
+    fn flow_kind_roundtrips_yaml() {
+        let yaml = serde_yaml::to_string(&FlowKind::Checkout).unwrap();
+        let back: FlowKind = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(back, FlowKind::Checkout);
+    }
+
+    #[test]
+    fn event_flow_default_description_empty() {
+        let f = EventFlow {
+            id: "flow_abc".into(),
+            name: "checkout".into(),
+            kind: FlowKind::Checkout,
+            description: String::new(),
+            steps: Vec::new(),
+            confidence: 0.85,
+        };
+        assert!(f.description.is_empty());
+    }
+
+    #[test]
+    fn catalog_flows_default_empty() {
+        let c = Catalog::default();
+        assert!(c.flows.is_empty());
+    }
+
+    #[test]
+    fn catalog_without_flows_yaml_omits_field() {
+        let cat = Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: vec![], flows: vec![] };
+        let yaml = serde_yaml::to_string(&cat).unwrap();
+        assert!(!yaml.contains("flows:"), "flows field should not appear when empty");
+    }
+
+    #[test]
+    fn catalog_entry_flow_ids_default_empty() {
+        let entry = make_entry("page_viewed");
+        assert!(entry.flow_ids.is_empty());
+    }
+
+    #[test]
+    fn catalog_entry_flow_ids_roundtrip_yaml() {
+        let mut entry = make_entry("checkout_started");
+        entry.flow_ids = vec!["flow_abc123".into()];
+        let cat = Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: vec![entry], flows: vec![] };
+        let yaml = serde_yaml::to_string(&cat).unwrap();
+        let back: Catalog = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(back.events[0].flow_ids, vec!["flow_abc123"]);
+    }
+
+    #[test]
+    fn catalog_entry_without_flow_ids_yaml_omits_field() {
+        let entry = make_entry("page_viewed");
+        let cat = Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: vec![entry], flows: vec![] };
+        let yaml = serde_yaml::to_string(&cat).unwrap();
+        assert!(!yaml.contains("flowIds:"), "flowIds should not appear when empty");
+    }
+
+    #[test]
+    fn flow_step_optional_defaults_false() {
+        let s = FlowStep { event_id: "evt_abc".into(), step_index: 0, optional: false };
+        assert!(!s.optional);
+    }
+
+    #[test]
+    fn event_flow_roundtrips_yaml() {
+        let flow = EventFlow {
+            id: "flow_001".into(),
+            name: "checkout".into(),
+            kind: FlowKind::Checkout,
+            description: "Purchase funnel".into(),
+            steps: vec![
+                FlowStep { event_id: "evt_a".into(), step_index: 0, optional: false },
+                FlowStep { event_id: "evt_b".into(), step_index: 1, optional: false },
+            ],
+            confidence: 0.85,
+        };
+        let cat = Catalog {
+            schema_version: CATALOG_SCHEMA_VERSION,
+            events: vec![],
+            flows: vec![flow.clone()],
+        };
+        let yaml = serde_yaml::to_string(&cat).unwrap();
+        let back: Catalog = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(back.flows[0].name, "checkout");
+        assert_eq!(back.flows[0].steps.len(), 2);
     }
 }

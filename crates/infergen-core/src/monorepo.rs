@@ -331,6 +331,7 @@ pub fn namespace_catalog(catalog: &Catalog, package_name: &str) -> Catalog {
                 ..e.clone()
             })
             .collect(),
+        flows: catalog.flows.clone(),
     }
 }
 
@@ -364,7 +365,7 @@ pub fn merge_package_catalogs(packages: &[(&str, &Catalog)]) -> Catalog {
         pa.cmp(pb).then(a.id.cmp(&b.id))
     });
 
-    Catalog { schema_version: CATALOG_SCHEMA_VERSION, events }
+    Catalog { schema_version: CATALOG_SCHEMA_VERSION, events, flows: Vec::new() }
 }
 
 // ---------------------------------------------------------------------------
@@ -460,11 +461,12 @@ mod tests {
                 .collect(),
             providers: vec![],
             package: None,
+            flow_ids: Vec::new(),
         }
     }
 
     fn make_catalog(entries: Vec<CatalogEntry>) -> Catalog {
-        Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: entries }
+        Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: entries, flows: Vec::new() }
     }
 
     // --- detect_monorepo ---

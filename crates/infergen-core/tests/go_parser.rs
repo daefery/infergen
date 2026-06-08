@@ -22,7 +22,7 @@ fn parse_go(rel: &str, src: &str) -> infergen_core::ParsedFile {
 }
 
 fn make_catalog(events: Vec<CatalogEntry>) -> Catalog {
-    Catalog { schema_version: CATALOG_SCHEMA_VERSION, events }
+    Catalog { schema_version: CATALOG_SCHEMA_VERSION, events, flows: Vec::new() }
 }
 
 fn make_entry(name: &str) -> CatalogEntry {
@@ -41,6 +41,7 @@ fn make_entry(name: &str) -> CatalogEntry {
         properties: Vec::new(),
         providers: Vec::new(),
         package: None,
+        flow_ids: Vec::new(),
     }
 }
 

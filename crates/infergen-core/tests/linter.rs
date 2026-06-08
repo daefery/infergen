@@ -29,6 +29,7 @@ fn make_entry(id: &str, name: &str, status: EventStatus) -> CatalogEntry {
             adapter: "nextjs".into(),
         }],
         package: None,
+        flow_ids: Vec::new(),
     }
 }
 
@@ -36,6 +37,7 @@ fn make_catalog(entries: Vec<CatalogEntry>) -> Catalog {
     Catalog {
         schema_version: 1,
         events: entries,
+        flows: Vec::new(),
     }
 }
 

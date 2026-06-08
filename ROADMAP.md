@@ -93,7 +93,7 @@ Goal: lift detection quality beyond heuristics.
 | Epic No | Name | Status | Description | Note/Blocker/Dependency |
 |---|---|---|---|---|
 | E6.1 | Local LLM Integration (Ollama) | Planned | Optional local-LLM pass to refine event names, descriptions, and property inference on low-confidence detections. Fully offline. | Depends on E1.2. Optional path — never required. |
-| E6.2 | Semantic Flow Detection | Planned | Detect multi-step funnels (checkout, onboarding) by linking related events across files. | Depends on E6.1, E0.4. |
+| E6.2 | Semantic Flow Detection | Done | Detect multi-step funnels (checkout, onboarding) by linking related events across files. | Depends on E6.1, E0.4. |
 | E6.3 | Suggestion Quality Loop | Planned | Learn from user accept/reject of proposals to tune confidence and naming locally (no cloud). | Depends on E1.5, E6.1. |
 
 ---
