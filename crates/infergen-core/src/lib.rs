@@ -19,6 +19,7 @@ pub mod manifest;
 pub mod monorepo;
 pub mod namer;
 pub mod parser;
+pub mod plugin;
 pub mod property;
 pub mod provider;
 pub mod quality;

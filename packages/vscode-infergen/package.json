@@ -1,0 +1,60 @@
+{
+  "name": "vscode-infergen",
+  "displayName": "Infergen",
+  "description": "Inline untracked moment hints, jump-to-trigger, and catalog autocomplete for Infergen analytics.",
+  "version": "0.0.0",
+  "publisher": "infergen",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other", "Linters"],
+  "activationEvents": [
+    "workspaceContains:.infergen/catalog.yaml",
+    "workspaceContains:infergen.config.json",
+    "workspaceContains:infergen.config.toml"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "infergen.approveEvent",  "title": "Infergen: Approve Event"    },
+      { "command": "infergen.ignoreEvent",   "title": "Infergen: Ignore Event"     },
+      { "command": "infergen.jumpToTrigger", "title": "Infergen: Jump to Trigger"  },
+      { "command": "infergen.runScan",       "title": "Infergen: Run Scan"         }
+    ],
+    "configuration": {
+      "title": "Infergen",
+      "properties": {
+        "infergen.binaryPath": {
+          "type": "string",
+          "default": "infergen",
+          "description": "Path to the infergen CLI binary (must be on PATH or absolute)."
+        },
+        "infergen.enableCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show code lens above tracked event trigger locations."
+        },
+        "infergen.enableDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline diagnostics for untracked moments and convention violations."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --platform=node --external:vscode --outfile=dist/extension.js",
+    "build:watch": "esbuild src/extension.ts --bundle --platform=node --external:vscode --outfile=dist/extension.js --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run src/test"
+  }
+}
