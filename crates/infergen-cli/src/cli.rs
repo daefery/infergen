@@ -34,6 +34,8 @@ pub enum Commands {
     Review(ReviewArgs),
     /// Generate an offline HTML catalog viewer and open it in the browser.
     View(ViewArgs),
+    /// Scaffold and describe plugin extension points.
+    Plugin(PluginArgs),
 }
 
 /// Arguments for `infergen generate`.
@@ -166,4 +168,44 @@ pub enum InitFormat {
     Json,
     /// TOML (`infergen.config.toml`).
     Toml,
+}
+
+/// Arguments for `infergen plugin`.
+#[derive(Debug, Args)]
+pub struct PluginArgs {
+    /// Sub-command to run.
+    #[command(subcommand)]
+    pub action: PluginAction,
+}
+
+/// `infergen plugin` sub-commands.
+#[derive(Debug, Subcommand)]
+pub enum PluginAction {
+    /// Generate a ready-to-compile Rust skeleton for a new plugin.
+    Scaffold {
+        /// Plugin type: `provider`, `adapter`, or `parser`.
+        #[arg(value_enum)]
+        kind: PluginKind,
+        /// Kebab-case name for the plugin (e.g. `my-provider`).
+        name: String,
+        /// Framework name (required for adapter scaffolds, e.g. `htmx`).
+        #[arg(long)]
+        framework: Option<String>,
+        /// Write output to this file instead of stdout.
+        #[arg(long, short)]
+        output: Option<PathBuf>,
+    },
+    /// List available plugin types and their trait contracts.
+    ListTypes,
+}
+
+/// Plugin type selector for `infergen plugin scaffold`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum PluginKind {
+    /// An analytics destination — implements `ProviderPlugin`.
+    Provider,
+    /// A framework adapter — implements `Adapter`.
+    Adapter,
+    /// A language parser — implements `LanguageParser`.
+    Parser,
 }
