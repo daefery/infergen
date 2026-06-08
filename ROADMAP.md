@@ -93,7 +93,7 @@ Goal: lift detection quality beyond heuristics.
 | Epic No | Name | Status | Description | Note/Blocker/Dependency |
 |---|---|---|---|---|
 | E6.1 | LLM Integration (Ollama · Claude · OpenAI) | Done | Optional LLM pass to refine event names, descriptions, and property inference on low-confidence detections. Supports Ollama (local/offline), Anthropic Claude API, OpenAI API, and any OpenAI-compatible endpoint. | Depends on E1.2. Optional path — never required. |
-| E6.2 | Semantic Flow Detection | Planned | Detect multi-step funnels (checkout, onboarding) by linking related events across files. | Depends on E6.1, E0.4. |
+| E6.2 | Semantic Flow Detection | Done | Detect multi-step funnels (checkout, onboarding) by linking related events across files. | Depends on E6.1, E0.4. |
 | E6.3 | Suggestion Quality Loop | Done | Learn from user accept/reject of proposals to tune confidence and naming locally (no cloud). | Depends on E1.5, E6.1. |
 
 ---
@@ -104,9 +104,9 @@ Goal: make Infergen pleasant, visible, and extensible.
 
 | Epic No | Name | Status | Description | Note/Blocker/Dependency |
 |---|---|---|---|---|
-| E7.1 | Catalog Web Viewer | Planned | Local, offline web UI to browse/search the catalog, see trigger locations, providers, and PII flags. | Depends on E1.1. |
-| E7.2 | Editor Integration | Planned | VS Code extension: inline "untracked moment" hints, jump-to-trigger, catalog autocomplete. | Depends on E2.1, E4.2. |
-| E7.3 | Plugin SDK & Docs | Planned | Documented contracts + scaffolding for community framework adapters, language parsers, and providers. | Depends on E3.1, E0.3. |
+| E7.1 | Catalog Web Viewer | Done | Local, offline web UI to browse/search the catalog, see trigger locations, providers, and PII flags. | Depends on E1.1. |
+| E7.2 | Editor Integration | Done | VS Code extension: inline "untracked moment" hints, jump-to-trigger, catalog autocomplete. | Depends on E2.1, E4.2. |
+| E7.3 | Plugin SDK & Docs | Done | Documented contracts + scaffolding for community framework adapters, language parsers, and providers. | Depends on E3.1, E0.3. |
 | E7.4 | Data-Collection Manifest Export | Planned | Export catalog as a privacy/compliance manifest (what's collected, where it's sent, PII inventory). | Depends on E1.4, E3.2. |
 | E7.5 | Onboarding & Templates | Planned | `init` templates per stack, example projects, getting-started docs, quickstart < 5 min. | Depends on E0.2, E0.4. |
 
