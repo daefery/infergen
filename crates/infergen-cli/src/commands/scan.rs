@@ -3,12 +3,13 @@
 use std::path::{Path, PathBuf};
 
 use infergen_core::{
-    Config, DjangoAdapter, FastApiAdapter, FlaskAdapter, FlowDetector, JsParser, NextjsAdapter,
-    PyParser,
+    Config, DjangoAdapter, EventKind, FastApiAdapter, FlaskAdapter, FeedbackStore, FlowDetector,
+    JsParser, NextjsAdapter, PyParser,
     adapter::Adapter,
     catalog::{assign_flows, from_proposals, load_catalog, rescan_merge, save_catalog},
     detect::{Framework, Language, detect},
     parser::LanguageParser,
+    quality_path,
     refine_catalog_with_config,
 };
 
@@ -127,7 +128,33 @@ pub fn run() -> anyhow::Result<()> {
         }
     }
 
-    // E6.2 — detect multi-step funnels across all proposals.
+    // Apply quality-loop feedback: confidence multipliers + name hints (E6.3).
+    let catalog_path = cwd.join(&config.catalog);
+    let feedback = FeedbackStore::load(&quality_path(&catalog_path)).unwrap_or_default();
+
+    for proposal in &mut all_proposals {
+        if !proposal.adapter.is_empty() {
+            let k = proposal_kind_str(proposal.kind);
+            let m = feedback.confidence_multiplier(&proposal.adapter, &k);
+            proposal.confidence = (proposal.confidence * m as f32).clamp(0.0, 1.0);
+        }
+    }
+
+    for proposal in &mut all_proposals {
+        if !proposal.adapter.is_empty() {
+            let rel = proposal
+                .source_path
+                .strip_prefix(&cwd)
+                .unwrap_or(&proposal.source_path)
+                .to_string_lossy();
+            let k = proposal_kind_str(proposal.kind);
+            if let Some(name) = feedback.name_hint(&proposal.adapter, &k, &rel) {
+                proposal.name = name;
+            }
+        }
+    }
+
+    // E6.2 — detect multi-step funnels across quality-adjusted proposals.
     let flow_detector = FlowDetector::new();
     let detected_flows = flow_detector.detect(&all_proposals);
     if !detected_flows.is_empty() {
@@ -142,8 +169,6 @@ pub fn run() -> anyhow::Result<()> {
             );
         }
     }
-
-    let catalog_path = cwd.join(&config.catalog);
 
     match load_catalog(&catalog_path) {
         Ok(existing) => {
@@ -211,4 +236,18 @@ pub fn run() -> anyhow::Result<()> {
 
     println!("catalog saved to {}", catalog_path.display());
     Ok(())
+}
+
+/// Translate a proposal [`EventKind`] to the camelCase string used in feedback entries.
+fn proposal_kind_str(kind: EventKind) -> String {
+    match kind {
+        EventKind::PageView => "pageView",
+        EventKind::ApiCall => "apiCall",
+        EventKind::AuthEvent => "authEvent",
+        EventKind::FormSubmit => "formSubmit",
+        EventKind::ButtonClick => "buttonClick",
+        EventKind::Search => "search",
+        EventKind::Error => "error",
+    }
+    .to_owned()
 }

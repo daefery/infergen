@@ -20,6 +20,7 @@ pub mod namer;
 pub mod parser;
 pub mod property;
 pub mod provider;
+pub mod quality;
 pub mod review;
 
 pub use adapter::django::DjangoAdapter;
@@ -44,6 +45,7 @@ pub use codegen::{CodegenConfig, GoCodegenConfig, RubyCodegenConfig, generate_go
 pub use config::Config;
 pub use llm::config::{LlmConfig, LlmProviderKind};
 pub use llm::refine::refine_catalog_with_config;
+pub use quality::{FeedbackAction, FeedbackEntry, FeedbackStore, quality_path};
 pub use detect::{DetectionResult, Framework, Language, detect};
 pub use infergen_types::{
     Catalog, CatalogEntry, CatalogEventKind, EventProperty, EventProvenance, EventStatus,
