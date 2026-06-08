@@ -7,8 +7,8 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use infergen_types::{
-    Catalog, CatalogEntry, CatalogEventKind, EventProperty, EventProvenance, EventStatus,
-    CATALOG_SCHEMA_VERSION,
+    Catalog, CatalogEntry, CatalogEventKind, EventFlow, EventProperty, EventProvenance, EventStatus,
+    FlowStep, CATALOG_SCHEMA_VERSION,
 };
 
 use crate::{Error, ProposedEvent, Result, adapter::EventKind};
@@ -97,6 +97,7 @@ fn proposal_to_entry(proposal: &ProposedEvent, project_root: &Path) -> CatalogEn
         properties,
         providers: Vec::new(),
         package: None,
+        flow_ids: Vec::new(),
     }
 }
 
@@ -121,6 +122,7 @@ pub fn from_proposals(proposals: &[ProposedEvent], project_root: &Path) -> Catal
     Catalog {
         schema_version: CATALOG_SCHEMA_VERSION,
         events,
+        flows: Vec::new(),
     }
 }
 
@@ -239,7 +241,139 @@ pub fn rescan_merge(
 
     merged.sort_by(|a, b| a.id.cmp(&b.id));
 
-    Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: merged }
+    Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: merged, flows: Vec::new() }
+}
+
+// ---------------------------------------------------------------------------
+// Flow assignment (E6.2)
+// ---------------------------------------------------------------------------
+
+/// Generate a stable flow ID from name and kind string.
+///
+/// Uses the same FNV-1a scheme as [`generate_stable_id`], prefixed `"flow_"`.
+fn generate_flow_id(name: &str, kind: &str) -> String {
+    const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+    const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+    let mut hash = FNV_OFFSET;
+    for byte in format!("{name}:{kind}").bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    format!("flow_{hash:016x}")
+}
+
+/// Assign detected flows to a catalog.
+///
+/// For each `DetectedFlow`:
+/// 1. Resolves each step's proposal index → the corresponding `CatalogEntry` ID.
+/// 2. Builds an `EventFlow` with stable ID, name, kind, steps, and confidence.
+/// 3. Sets `flow_ids` back-references on matching `CatalogEntry` rows.
+///
+/// **Preservation rules:**
+/// - Flows in `catalog.flows` whose IDs do NOT appear in `detected` (manually
+///   added flows) are kept verbatim.
+/// - Flows whose IDs DO appear in `detected` have their `steps` updated but
+///   their `description` preserved if non-empty.
+pub fn assign_flows(
+    catalog: &mut Catalog,
+    detected: &[crate::flow::DetectedFlow],
+    proposals: &[ProposedEvent],
+    project_root: &Path,
+) {
+    // Build a (name, rel_path, kind_str) → catalog index lookup.
+    let entry_id_lookup: std::collections::HashMap<String, usize> = catalog
+        .events
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (e.id.clone(), i))
+        .collect();
+
+    // Helper: resolve a proposal to its stable event ID.
+    let proposal_to_id = |p: &ProposedEvent| -> Option<String> {
+        let rel = p
+            .source_path
+            .strip_prefix(project_root)
+            .unwrap_or(&p.source_path)
+            .to_string_lossy()
+            .to_string();
+        let id = generate_stable_id(&p.name, &rel, kind_to_str(p.kind));
+        if entry_id_lookup.contains_key(&id) { Some(id) } else { None }
+    };
+
+    // Convert each DetectedFlow to an EventFlow.
+    let mut new_flows: Vec<EventFlow> = Vec::new();
+    let mut auto_flow_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for df in detected {
+        let kind_str = format!("{:?}", df.kind).to_lowercase();
+        let flow_id = generate_flow_id(&df.name, &kind_str);
+        auto_flow_ids.insert(flow_id.clone());
+
+        let steps: Vec<FlowStep> = df
+            .steps
+            .iter()
+            .filter_map(|s| {
+                let proposal = proposals.get(s.proposal_idx)?;
+                let event_id = proposal_to_id(proposal)?;
+                Some(FlowStep {
+                    event_id,
+                    step_index: s.step_index,
+                    optional: false,
+                })
+            })
+            .collect();
+
+        if steps.len() < 2 {
+            continue;
+        }
+
+        // Preserve description from an existing flow with the same ID.
+        let existing_desc = catalog
+            .flows
+            .iter()
+            .find(|f| f.id == flow_id)
+            .map(|f| f.description.clone())
+            .unwrap_or_default();
+
+        new_flows.push(EventFlow {
+            id: flow_id,
+            name: df.name.clone(),
+            kind: df.kind.clone(),
+            description: existing_desc,
+            steps,
+            confidence: f64::from(df.confidence),
+        });
+    }
+
+    // Merge: keep manual flows (unknown auto IDs) + add/update auto flows.
+    let mut merged_flows: Vec<EventFlow> = catalog
+        .flows
+        .iter()
+        .filter(|f| !auto_flow_ids.contains(&f.id))
+        .cloned()
+        .collect();
+    merged_flows.extend(new_flows);
+    merged_flows.sort_by(|a, b| a.name.cmp(&b.name));
+    catalog.flows = merged_flows;
+
+    // Recompute flow_ids back-references on all entries.
+    let mut event_to_flows: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for flow in &catalog.flows {
+        for step in &flow.steps {
+            event_to_flows
+                .entry(step.event_id.clone())
+                .or_default()
+                .push(flow.id.clone());
+        }
+    }
+    for entry in &mut catalog.events {
+        entry.flow_ids = event_to_flows
+            .get(&entry.id)
+            .cloned()
+            .unwrap_or_default();
+        entry.flow_ids.sort();
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -430,11 +564,12 @@ mod tests {
             properties: Vec::new(),
             providers: Vec::new(),
             package: None,
+            flow_ids: Vec::new(),
         }
     }
 
     fn make_catalog_with(entries: Vec<CatalogEntry>) -> Catalog {
-        Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: entries }
+        Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: entries, flows: vec![] }
     }
 
     #[test]
@@ -630,5 +765,141 @@ mod tests {
         // new_event: added
         assert!(result.events.iter().any(|e| e.name == "new_event"), "new_event must be added");
         assert_eq!(result.events.iter().filter(|e| e.name == "new_event").next().unwrap().status, EventStatus::Proposed);
+    }
+
+    // ---------------------------------------------------------------------------
+    // assign_flows tests (E6.2)
+    // ---------------------------------------------------------------------------
+
+    fn make_two_step_flow(name: &str) -> crate::flow::DetectedFlow {
+        use infergen_types::FlowKind;
+        crate::flow::DetectedFlow {
+            name: name.to_owned(),
+            kind: FlowKind::Checkout,
+            confidence: 0.85,
+            steps: vec![
+                crate::flow::DetectedStep { proposal_idx: 0, step_index: 0 },
+                crate::flow::DetectedStep { proposal_idx: 1, step_index: 1 },
+            ],
+        }
+    }
+
+    #[test]
+    fn assign_flows_populates_catalog_flows() {
+        let root = Path::new("/root");
+        let proposals = vec![
+            make_proposal("cart_viewed", EventKind::PageView, "/root/checkout/cart.tsx", 0.9),
+            make_proposal("order_confirmed", EventKind::PageView, "/root/checkout/confirm.tsx", 0.9),
+        ];
+        let mut catalog = from_proposals(&proposals, root);
+        let detected = vec![make_two_step_flow("checkout")];
+        assign_flows(&mut catalog, &detected, &proposals, root);
+        assert_eq!(catalog.flows.len(), 1);
+        assert_eq!(catalog.flows[0].name, "checkout");
+        assert_eq!(catalog.flows[0].steps.len(), 2);
+    }
+
+    #[test]
+    fn assign_flows_sets_back_references() {
+        let root = Path::new("/root");
+        let proposals = vec![
+            make_proposal("cart_viewed", EventKind::PageView, "/root/checkout/cart.tsx", 0.9),
+            make_proposal("order_confirmed", EventKind::PageView, "/root/checkout/confirm.tsx", 0.9),
+        ];
+        let mut catalog = from_proposals(&proposals, root);
+        let detected = vec![make_two_step_flow("checkout")];
+        assign_flows(&mut catalog, &detected, &proposals, root);
+        let flow_id = &catalog.flows[0].id;
+        let entries_with_ref: Vec<_> = catalog
+            .events
+            .iter()
+            .filter(|e| e.flow_ids.contains(flow_id))
+            .collect();
+        assert_eq!(entries_with_ref.len(), 2);
+    }
+
+    #[test]
+    fn assign_flows_preserves_manual_flows() {
+        use infergen_types::{EventFlow, FlowKind, FlowStep};
+        let root = Path::new("/root");
+        let proposals = vec![
+            make_proposal("cart_viewed", EventKind::PageView, "/root/checkout/cart.tsx", 0.9),
+            make_proposal("order_confirmed", EventKind::PageView, "/root/checkout/confirm.tsx", 0.9),
+        ];
+        let mut catalog = from_proposals(&proposals, root);
+        // Add a manual flow with a unique ID that won't collide with auto-detected.
+        catalog.flows.push(EventFlow {
+            id: "flow_manual_0000000".into(),
+            name: "custom_manual_flow".into(),
+            kind: FlowKind::Custom,
+            description: "Manually added".into(),
+            steps: vec![FlowStep { event_id: "evt_abc".into(), step_index: 0, optional: false }],
+            confidence: 1.0,
+        });
+        let detected = vec![make_two_step_flow("checkout")];
+        assign_flows(&mut catalog, &detected, &proposals, root);
+        let manual = catalog.flows.iter().find(|f| f.id == "flow_manual_0000000");
+        assert!(manual.is_some(), "manual flow must survive assign_flows");
+    }
+
+    #[test]
+    fn assign_flows_updates_steps_preserves_description() {
+        use infergen_types::{EventFlow, FlowKind, FlowStep};
+        let root = Path::new("/root");
+        let proposals = vec![
+            make_proposal("cart_viewed", EventKind::PageView, "/root/checkout/cart.tsx", 0.9),
+            make_proposal("order_confirmed", EventKind::PageView, "/root/checkout/confirm.tsx", 0.9),
+        ];
+        let mut catalog = from_proposals(&proposals, root);
+
+        // Pre-populate with the auto-detected flow (same ID) but with a human description.
+        let flow_id = generate_flow_id("checkout", "checkout");
+        catalog.flows.push(EventFlow {
+            id: flow_id.clone(),
+            name: "checkout".into(),
+            kind: FlowKind::Checkout,
+            description: "Human-written description".into(),
+            steps: vec![FlowStep { event_id: "evt_old".into(), step_index: 0, optional: false }],
+            confidence: 0.7,
+        });
+
+        let detected = vec![make_two_step_flow("checkout")];
+        assign_flows(&mut catalog, &detected, &proposals, root);
+
+        let flow = catalog.flows.iter().find(|f| f.id == flow_id).unwrap();
+        assert_eq!(flow.description, "Human-written description", "description must survive");
+        assert_eq!(flow.steps.len(), 2, "steps must be updated");
+    }
+
+    #[test]
+    fn generate_flow_id_deterministic() {
+        let id1 = generate_flow_id("checkout", "checkout");
+        let id2 = generate_flow_id("checkout", "checkout");
+        assert_eq!(id1, id2);
+        assert!(id1.starts_with("flow_"));
+    }
+
+    #[test]
+    fn assign_flows_empty_detected_preserves_existing_flows() {
+        // When detected is empty, assign_flows has no auto-flow IDs to replace —
+        // all existing flows are preserved (no way to distinguish auto vs manual without
+        // a re-detection pass).
+        use infergen_types::{EventFlow, FlowKind};
+        let root = Path::new("/root");
+        let proposals = vec![
+            make_proposal("cart_viewed", EventKind::PageView, "/root/checkout/cart.tsx", 0.9),
+        ];
+        let mut catalog = from_proposals(&proposals, root);
+        catalog.flows.push(EventFlow {
+            id: generate_flow_id("checkout", "checkout"),
+            name: "checkout".into(),
+            kind: FlowKind::Checkout,
+            description: String::new(),
+            steps: Vec::new(),
+            confidence: 0.85,
+        });
+        assign_flows(&mut catalog, &[], &proposals, root);
+        // Empty detected → no auto_flow_ids → all existing flows preserved.
+        assert_eq!(catalog.flows.len(), 1, "existing flows must be preserved when detected is empty");
     }
 }

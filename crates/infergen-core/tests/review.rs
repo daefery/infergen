@@ -33,11 +33,12 @@ fn make_entry(id: &str, name: &str, status: EventStatus) -> CatalogEntry {
         properties: Vec::new(),
         providers: Vec::new(),
         package: None,
+        flow_ids: Vec::new(),
     }
 }
 
 fn make_catalog(entries: Vec<CatalogEntry>) -> Catalog {
-    Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: entries }
+    Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: entries, flows: Vec::new() }
 }
 
 fn make_proposal(name: &str, kind: EventKind, path: &str) -> ProposedEvent {

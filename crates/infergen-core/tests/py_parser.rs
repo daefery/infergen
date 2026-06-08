@@ -24,7 +24,7 @@ fn parse_py(project_root: &str, rel_path: &str, source: &str) -> infergen_core::
 }
 
 fn make_catalog(entries: Vec<CatalogEntry>) -> infergen_core::Catalog {
-    infergen_core::Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: entries }
+    infergen_core::Catalog { schema_version: CATALOG_SCHEMA_VERSION, events: entries, flows: Vec::new() }
 }
 
 fn make_entry(name: &str) -> CatalogEntry {
@@ -43,6 +43,7 @@ fn make_entry(name: &str) -> CatalogEntry {
         properties: Vec::new(),
         providers: Vec::new(),
         package: None,
+        flow_ids: Vec::new(),
     }
 }
 
