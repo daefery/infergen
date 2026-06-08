@@ -10,10 +10,12 @@ mod consent;
 mod delivery;
 pub mod go_gen;
 mod python;
+pub mod ruby_gen;
 use consent::write_consent_module;
 use delivery::write_delivery_engine;
 pub use go_gen::{GoCodegenConfig, generate_go};
 pub use python::generate_python;
+pub use ruby_gen::{RubyCodegenConfig, generate_ruby};
 
 use infergen_types::{CatalogEntry, EventProperty, EventStatus};
 

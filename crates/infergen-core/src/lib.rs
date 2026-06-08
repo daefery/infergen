@@ -26,9 +26,10 @@ pub use adapter::flask::FlaskAdapter;
 pub use adapter::gin::GinAdapter;
 pub use adapter::nethttp::NetHttpAdapter;
 pub use adapter::nextjs::NextjsAdapter;
+pub use adapter::rails::RailsAdapter;
 pub use adapter::{Adapter, EventKind, PropertyHint, ProposedEvent};
 pub use catalog::{from_proposals, load_catalog, merge_proposals, rescan_merge, save_catalog};
-pub use codegen::{CodegenConfig, GoCodegenConfig, generate_go, generate_python, generate_typescript};
+pub use codegen::{CodegenConfig, GoCodegenConfig, RubyCodegenConfig, generate_go, generate_python, generate_ruby, generate_typescript};
 pub use config::Config;
 pub use detect::{DetectionResult, Framework, Language, detect};
 pub use infergen_types::{
@@ -45,6 +46,7 @@ pub use review::{
 pub use parser::go::GoParser;
 pub use parser::js::JsParser;
 pub use parser::py::PyParser;
+pub use parser::ruby::RubyParser;
 pub use provider::{ProviderPlugin, ProviderRegistry, TrackEvent};
 pub use parser::{Diagnostic, LanguageParser, ParsedFile};
 
