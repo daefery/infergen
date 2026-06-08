@@ -118,7 +118,7 @@ Goal: production-ready 1.0.
 
 | Epic No | Name | Status | Description | Note/Blocker/Dependency |
 |---|---|---|---|---|
-| E8.1 | Performance & Caching | Planned | Parallel scanning, incremental AST cache; medium repo scan in seconds, incremental sub-second. | Depends on E4.1. |
+| E8.1 | Performance & Caching | Done    | Parallel scanning, incremental AST cache; medium repo scan in seconds, incremental sub-second. | Depends on E4.1. |
 | E8.2 | Test Suite & Fixtures | Done | Golden-file tests per adapter, real-world fixture repos, codegen snapshot tests, runtime delivery tests. | Cross-cutting; grows with each adapter. |
 | E8.3 | Distribution & Versioning | Planned | Single-binary CLI releases per platform, npm/pip/go-module runtime packages, semver + catalog schema migration. | Depends on E0.1. |
 | E8.4 | Docs Site & Examples | Planned | Full documentation site, API reference, adapter gallery, migration guides from Typewriter/Avo. | Depends on E7.5. |

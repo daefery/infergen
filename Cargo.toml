@@ -26,6 +26,8 @@ serde_yaml = "0.9"
 ureq       = { version = "2", features = ["native-tls", "json"] }
 # Cross-platform browser/file opener for catalog web viewer (E7.1).
 open       = "5"
+# Data-parallel iteration for scan performance (E8.1).
+rayon      = "1"
 # Dev-only (testing): temp dirs for config/detection/integration tests.
 tempfile   = "3"
 # Snapshot testing for codegen output (E8.2).
