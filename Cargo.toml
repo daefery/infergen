@@ -28,6 +28,8 @@ ureq       = { version = "2", features = ["native-tls", "json"] }
 open       = "5"
 # Dev-only (testing): temp dirs for config/detection/integration tests.
 tempfile   = "3"
+# Snapshot testing for codegen output (E8.2).
+insta      = { version = "1", features = ["yaml"] }
 # OXC: TS/JS AST parser (E0.3). All sub-crates must share the same version.
 oxc_allocator = "0.134"
 oxc_parser    = "0.134"
