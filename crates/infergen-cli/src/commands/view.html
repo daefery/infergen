@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Infergen Catalog Viewer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+           background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+    /* Header */
+    .header { padding: 1.25rem 2rem; border-bottom: 1px solid #1e293b;
+              display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+    .header h1 { font-size: 1.125rem; font-weight: 600; color: #f8fafc; letter-spacing: -.01em; }
+    .stats { display: flex; gap: .6rem; flex-wrap: wrap; }
+    .badge { padding: .2rem .6rem; border-radius: .375rem; font-size: .72rem;
+             font-weight: 600; white-space: nowrap; }
+    .badge-total    { background: #1e293b; color: #94a3b8; }
+    .badge-approved { background: #14532d; color: #86efac; }
+    .badge-proposed { background: #1e3a5f; color: #93c5fd; }
+    .badge-ignored  { background: #2d1b1b; color: #fca5a5; }
+
+    /* Filters */
+    .filters { padding: .875rem 2rem; display: flex; gap: .6rem; flex-wrap: wrap;
+               border-bottom: 1px solid #1e293b; background: #0d1117; }
+    .filters input, .filters select {
+      background: #1e293b; border: 1px solid #334155; border-radius: .375rem;
+      color: #e2e8f0; padding: .35rem .7rem; font-size: .85rem; outline: none; }
+    .filters input:focus, .filters select:focus { border-color: #3b82f6; }
+    .filters input { min-width: 200px; }
+    .filters label { display: flex; align-items: center; gap: .4rem;
+                     font-size: .85rem; color: #94a3b8; cursor: pointer; user-select: none; }
+    .filters label input[type=checkbox] { accent-color: #3b82f6; width: .9rem; height: .9rem; }
+
+    /* Table area */
+    .table-wrap { padding: .75rem 2rem 2rem; overflow-x: auto; }
+    .count-note { color: #64748b; font-size: .78rem; padding: .4rem 0 .6rem; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    thead th { text-align: left; color: #64748b; font-weight: 500; font-size: .72rem;
+               text-transform: uppercase; letter-spacing: .05em;
+               padding: .45rem .7rem; border-bottom: 1px solid #1e293b; }
+    tbody tr.event-row { border-bottom: 1px solid #1a2234; cursor: pointer; transition: background .1s; }
+    tbody tr.event-row:hover { background: #161d2e; }
+    tbody td { padding: .55rem .7rem; vertical-align: middle; }
+    .name-cell { font-weight: 500; color: #f1f5f9; max-width: 260px;
+                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mono { font-family: "SF Mono", Menlo, "Cascadia Code", monospace;
+            font-size: .78rem; color: #94a3b8; }
+
+    /* Badges */
+    .st { padding: .12rem .48rem; border-radius: .25rem; font-size: .7rem; font-weight: 600; }
+    .st-proposed { background: #1e3a5f; color: #93c5fd; }
+    .st-approved  { background: #14532d; color: #86efac; }
+    .st-ignored   { background: #2d1b1b; color: #fca5a5; }
+    .kind-badge { padding: .1rem .42rem; border-radius: .25rem; font-size: .7rem;
+                  background: #1e293b; color: #94a3b8; border: 1px solid #334155; white-space: nowrap; }
+
+    /* Confidence */
+    .conf-wrap { display: flex; align-items: center; gap: .45rem; min-width: 72px; }
+    .conf-bar  { flex: 1; height: 4px; background: #1e293b; border-radius: 2px; overflow: hidden; }
+    .conf-fill { height: 100%; border-radius: 2px; transition: width .2s; }
+    .conf-hi   { background: #22c55e; }
+    .conf-mid  { background: #eab308; }
+    .conf-lo   { background: #ef4444; }
+    .conf-pct  { font-size: .7rem; color: #64748b; min-width: 28px; text-align: right; }
+
+    /* Detail panel */
+    tr.detail-row td { padding: 0; }
+    .detail { background: #101624; border-top: 2px solid #3b82f6; padding: 1rem 1.5rem 1.25rem; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: .75rem; }
+    @media (max-width: 640px) { .detail-grid { grid-template-columns: 1fr; } }
+    .detail-section h3 { font-size: .7rem; color: #64748b; font-weight: 600;
+                         text-transform: uppercase; letter-spacing: .06em; margin-bottom: .45rem; }
+    .detail-section + .detail-section { margin-top: .85rem; }
+    .desc { font-size: .875rem; color: #cbd5e1; }
+    .no-desc { font-size: .875rem; color: #475569; font-style: italic; }
+    .prop-list { list-style: none; }
+    .prop-list li { font-size: .8rem; padding: .18rem 0; color: #94a3b8;
+                    display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
+    .prop-name { color: #e2e8f0; font-family: monospace; }
+    .prop-type { color: #60a5fa; font-family: monospace; }
+    .pii-badge { font-size: .65rem; background: #431407; color: #fb923c;
+                 border-radius: .2rem; padding: .05rem .3rem; font-weight: 600; }
+    .req-badge { font-size: .65rem; background: #1e293b; color: #94a3b8;
+                 border-radius: .2rem; padding: .05rem .3rem; }
+    .prov-list { list-style: none; }
+    .prov-list li { font-size: .78rem; padding: .15rem 0; font-family: monospace; color: #94a3b8; }
+    .provider-chip { display: inline-block; background: #1e293b; border: 1px solid #334155;
+                     border-radius: .25rem; padding: .1rem .4rem; font-size: .73rem;
+                     color: #a5b4fc; margin: .1rem; }
+    .empty-note { color: #475569; font-size: .8rem; font-style: italic; }
+    .id-chip { font-family: monospace; font-size: .75rem; color: #475569; word-break: break-all; }
+
+    /* Empty state */
+    .empty-state { text-align: center; color: #475569; padding: 3rem 1rem; font-size: .9rem; }
+    .pii-icon { font-size: .85rem; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>⚡ Infergen Catalog</h1>
+  <div class="stats" id="stats"></div>
+</div>
+
+<div class="filters">
+  <input type="text" id="q" placeholder="Search event names…" oninput="render()">
+  <select id="sf" onchange="render()">
+    <option value="">All statuses</option>
+    <option value="proposed">Proposed</option>
+    <option value="approved">Approved</option>
+    <option value="ignored">Ignored</option>
+  </select>
+  <select id="kf" onchange="render()">
+    <option value="">All kinds</option>
+    <option value="pageView">Page View</option>
+    <option value="apiCall">API Call</option>
+    <option value="authEvent">Auth Event</option>
+    <option value="formSubmit">Form Submit</option>
+    <option value="buttonClick">Button Click</option>
+    <option value="search">Search</option>
+    <option value="error">Error</option>
+  </select>
+  <label><input type="checkbox" id="pf" onchange="render()"> PII only</label>
+</div>
+
+<div class="table-wrap">
+  <div class="count-note" id="cn"></div>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Kind</th>
+        <th>Status</th>
+        <th>Confidence</th>
+        <th>PII</th>
+        <th>Sources</th>
+      </tr>
+    </thead>
+    <tbody id="tb"></tbody>
+  </table>
+  <div id="es" class="empty-state" style="display:none">No events match the current filters.</div>
+</div>
+
+<script>
+const CATALOG = __CATALOG_JSON__;
+const events = CATALOG.events || [];
+let openId = null;
+
+function esc(s) {
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function hasPii(ev) { return (ev.properties||[]).some(p=>p.pii); }
+function stClass(s) { return s==='approved'?'st-approved':s==='ignored'?'st-ignored':'st-proposed'; }
+function cfClass(c) { return c>=0.8?'conf-hi':c>=0.5?'conf-mid':'conf-lo'; }
+
+function renderStats() {
+  const tot=events.length,
+        app=events.filter(e=>e.status==='approved').length,
+        pro=events.filter(e=>e.status==='proposed').length,
+        ign=events.filter(e=>e.status==='ignored').length;
+  document.getElementById('stats').innerHTML=
+    `<span class="badge badge-total">${tot} total</span>`+
+    `<span class="badge badge-approved">${app} approved</span>`+
+    `<span class="badge badge-proposed">${pro} proposed</span>`+
+    `<span class="badge badge-ignored">${ign} ignored</span>`;
+}
+
+function buildDetail(ev) {
+  const props=(ev.properties||[]);
+  const provs=(ev.provenance||[]);
+  const prov=(ev.providers||[]);
+  const descHtml=ev.description
+    ?`<p class="desc">${esc(ev.description)}</p>`
+    :`<p class="no-desc">No description</p>`;
+  const propsHtml=props.length
+    ?`<ul class="prop-list">${props.map(p=>
+        `<li><span class="prop-name">${esc(p.name)}</span>`+
+        `<span class="prop-type">${esc(p.type||'unknown')}</span>`+
+        (p.pii?`<span class="pii-badge">PII</span>`:'')+
+        (p.required?`<span class="req-badge">required</span>`:'')+
+        `</li>`).join('')}</ul>`
+    :`<span class="empty-note">none</span>`;
+  const provsHtml=provs.length
+    ?`<ul class="prov-list">${provs.map(p=>
+        `<li>${esc(p.sourcePath)}${p.line!=null?':'+p.line:''}${p.adapter?' <span style="color:#475569">('+esc(p.adapter)+')</span>':''}</li>`
+      ).join('')}</ul>`
+    :`<span class="empty-note">none</span>`;
+  const provHtml=prov.length
+    ?prov.map(p=>`<span class="provider-chip">${esc(p)}</span>`).join('')
+    :`<span class="empty-note">none configured</span>`;
+  return `<td colspan="6"><div class="detail">
+    <div class="detail-section">${descHtml}</div>
+    <div class="detail-grid">
+      <div>
+        <div class="detail-section"><h3>Properties (${props.length})</h3>${propsHtml}</div>
+        <div class="detail-section"><h3>Providers</h3>${provHtml}</div>
+      </div>
+      <div>
+        <div class="detail-section"><h3>Source Locations (${provs.length})</h3>${provsHtml}</div>
+        <div class="detail-section"><h3>Stable ID</h3><span class="id-chip">${esc(ev.id)}</span></div>
+      </div>
+    </div>
+  </div></td>`;
+}
+
+function render() {
+  const q=document.getElementById('q').value.toLowerCase();
+  const sf=document.getElementById('sf').value;
+  const kf=document.getElementById('kf').value;
+  const pf=document.getElementById('pf').checked;
+  const filtered=events.filter(ev=>{
+    if(q&&!ev.name.toLowerCase().includes(q))return false;
+    if(sf&&ev.status!==sf)return false;
+    if(kf&&ev.kind!==kf)return false;
+    if(pf&&!hasPii(ev))return false;
+    return true;
+  });
+  document.getElementById('cn').textContent=
+    filtered.length===events.length
+      ?`${events.length} events`
+      :`${filtered.length} of ${events.length} events`;
+  const tb=document.getElementById('tb');
+  tb.innerHTML='';
+  document.getElementById('es').style.display=filtered.length?'none':'block';
+  filtered.forEach(ev=>{
+    const pct=Math.round(ev.confidence*100);
+    const srcs=(ev.provenance||[]).length;
+    const pii=hasPii(ev);
+    const tr=document.createElement('tr');
+    tr.className='event-row';
+    tr.dataset.id=ev.id;
+    tr.innerHTML=
+      `<td class="name-cell" title="${esc(ev.name)}">${esc(ev.name)}</td>`+
+      `<td><span class="kind-badge">${esc(ev.kind)}</span></td>`+
+      `<td><span class="st ${stClass(ev.status)}">${esc(ev.status)}</span></td>`+
+      `<td><div class="conf-wrap"><div class="conf-bar"><div class="conf-fill ${cfClass(ev.confidence)}" style="width:${pct}%"></div></div><span class="conf-pct">${pct}%</span></div></td>`+
+      `<td class="pii-icon">${pii?'🔒':'<span style="color:#334155">–</span>'}</td>`+
+      `<td class="mono">${srcs}</td>`;
+    tr.addEventListener('click',()=>{
+      if(openId===ev.id){
+        openId=null;
+        const d=document.getElementById('d-'+ev.id);
+        if(d)d.remove();
+      } else {
+        if(openId){const p=document.getElementById('d-'+openId);if(p)p.remove();}
+        openId=ev.id;
+        const dr=document.createElement('tr');
+        dr.className='detail-row';
+        dr.id='d-'+ev.id;
+        dr.innerHTML=buildDetail(ev);
+        tr.after(dr);
+      }
+    });
+    tb.appendChild(tr);
+  });
+}
+
+renderStats();
+render();
+</script>
+</body>
+</html>
