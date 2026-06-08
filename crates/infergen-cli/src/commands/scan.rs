@@ -8,6 +8,7 @@ use infergen_core::{
     catalog::{from_proposals, load_catalog, rescan_merge, save_catalog},
     detect::{Framework, Language, detect},
     parser::LanguageParser,
+    refine_catalog_with_config,
 };
 
 /// Walk `root` recursively and collect JS/TS files.
@@ -129,7 +130,18 @@ pub fn run() -> anyhow::Result<()> {
 
     match load_catalog(&catalog_path) {
         Ok(existing) => {
-            let merged = rescan_merge(&existing, &all_proposals, &cwd);
+            let mut merged = rescan_merge(&existing, &all_proposals, &cwd);
+
+            // Optional LLM refinement pass (E6.1).
+            if let Some(llm_cfg) = &config.llm {
+                if llm_cfg.enabled {
+                    match refine_catalog_with_config(&mut merged, llm_cfg) {
+                        Ok(n) if n > 0 => println!("  {n} events refined by LLM"),
+                        Ok(_) => {}
+                        Err(e) => eprintln!("  LLM pass skipped: {e}"),
+                    }
+                }
+            }
 
             let new_count = merged
                 .events
@@ -151,7 +163,19 @@ pub fn run() -> anyhow::Result<()> {
         }
         Err(infergen_core::Error::Io(_)) => {
             // No catalog yet — fresh scan.
-            let cat = from_proposals(&all_proposals, &cwd);
+            let mut cat = from_proposals(&all_proposals, &cwd);
+
+            // Optional LLM refinement pass (E6.1).
+            if let Some(llm_cfg) = &config.llm {
+                if llm_cfg.enabled {
+                    match refine_catalog_with_config(&mut cat, llm_cfg) {
+                        Ok(n) if n > 0 => println!("  {n} events refined by LLM"),
+                        Ok(_) => {}
+                        Err(e) => eprintln!("  LLM pass skipped: {e}"),
+                    }
+                }
+            }
+
             println!("  {} events proposed", cat.events.len());
             save_catalog(&cat, &catalog_path)?;
         }

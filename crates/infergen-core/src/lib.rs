@@ -13,6 +13,7 @@ pub mod codegen;
 pub mod config;
 pub mod detect;
 pub mod linter;
+pub mod llm;
 pub mod monorepo;
 pub mod namer;
 pub mod parser;
@@ -37,6 +38,8 @@ pub use adapter::{Adapter, EventKind, PropertyHint, ProposedEvent};
 pub use catalog::{from_proposals, load_catalog, merge_proposals, rescan_merge, save_catalog};
 pub use codegen::{CodegenConfig, GoCodegenConfig, RubyCodegenConfig, generate_go, generate_python, generate_ruby, generate_typescript};
 pub use config::Config;
+pub use llm::config::{LlmConfig, LlmProviderKind};
+pub use llm::refine::refine_catalog_with_config;
 pub use detect::{DetectionResult, Framework, Language, detect};
 pub use infergen_types::{
     Catalog, CatalogEntry, CatalogEventKind, EventProperty, EventProvenance, EventStatus,
