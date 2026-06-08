@@ -27,6 +27,10 @@ pub enum Language {
     Go,
     /// Ruby.
     Ruby,
+    /// Vue / Nuxt.
+    Vue,
+    /// Svelte / SvelteKit.
+    Svelte,
 }
 
 /// A framework/runtime Infergen has (or will have) an adapter for.
@@ -150,9 +154,11 @@ fn detect_js(root: &Path, result: &mut DetectionResult) {
     }
     if deps.contains("vue") || deps.contains("nuxt") {
         result.add_framework(Framework::Vue);
+        result.add_language(Language::Vue);
     }
     if deps.contains("@sveltejs/kit") || deps.contains("svelte") {
         result.add_framework(Framework::SvelteKit);
+        result.add_language(Language::Svelte);
     }
 }
 
@@ -361,6 +367,45 @@ mod tests {
         let r = detect(dir.path()).unwrap();
         assert!(r.languages.contains(&Language::TypeScript));
         assert!(r.frameworks.is_empty());
+    }
+
+    #[test]
+    fn detects_vue_language_from_deps() {
+        let dir = tempdir().unwrap();
+        write(dir.path(), "package.json", r#"{"dependencies":{"vue":"3"}}"#);
+        let r = detect(dir.path()).unwrap();
+        assert!(r.languages.contains(&Language::Vue));
+        assert!(r.frameworks.contains(&Framework::Vue));
+    }
+
+    #[test]
+    fn detects_svelte_language_from_deps() {
+        let dir = tempdir().unwrap();
+        write(
+            dir.path(),
+            "package.json",
+            r#"{"devDependencies":{"@sveltejs/kit":"1"}}"#,
+        );
+        let r = detect(dir.path()).unwrap();
+        assert!(r.languages.contains(&Language::Svelte));
+        assert!(r.frameworks.contains(&Framework::SvelteKit));
+    }
+
+    #[test]
+    fn detects_nuxt_adds_vue_language() {
+        let dir = tempdir().unwrap();
+        write(dir.path(), "package.json", r#"{"dependencies":{"nuxt":"3"}}"#);
+        let r = detect(dir.path()).unwrap();
+        assert!(r.languages.contains(&Language::Vue));
+    }
+
+    #[test]
+    fn enum_serializes_vue_svelte() {
+        assert_eq!(serde_json::to_string(&Language::Vue).unwrap(), "\"vue\"");
+        assert_eq!(
+            serde_json::to_string(&Language::Svelte).unwrap(),
+            "\"svelte\""
+        );
     }
 
     #[test]

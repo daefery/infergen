@@ -21,12 +21,17 @@ pub mod review;
 
 pub use adapter::django::DjangoAdapter;
 pub use adapter::echo::EchoAdapter;
+pub use adapter::express::ExpressAdapter;
 pub use adapter::fastapi::FastApiAdapter;
 pub use adapter::flask::FlaskAdapter;
 pub use adapter::gin::GinAdapter;
+pub use adapter::nestjs::NestJsAdapter;
 pub use adapter::nethttp::NetHttpAdapter;
 pub use adapter::nextjs::NextjsAdapter;
 pub use adapter::rails::RailsAdapter;
+pub use adapter::react_router::ReactRouterAdapter;
+pub use adapter::svelte_kit::SvelteKitAdapter;
+pub use adapter::vue::VueAdapter;
 pub use adapter::{Adapter, EventKind, PropertyHint, ProposedEvent};
 pub use catalog::{from_proposals, load_catalog, merge_proposals, rescan_merge, save_catalog};
 pub use codegen::{CodegenConfig, GoCodegenConfig, RubyCodegenConfig, generate_go, generate_python, generate_ruby, generate_typescript};
@@ -47,6 +52,8 @@ pub use parser::go::GoParser;
 pub use parser::js::JsParser;
 pub use parser::py::PyParser;
 pub use parser::ruby::RubyParser;
+pub use parser::svelte::SvelteParser;
+pub use parser::vue::VueParser;
 pub use provider::{ProviderPlugin, ProviderRegistry, TrackEvent};
 pub use parser::{Diagnostic, LanguageParser, ParsedFile};
 
