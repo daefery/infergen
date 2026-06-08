@@ -36,6 +36,8 @@ pub enum Commands {
     View(ViewArgs),
     /// Scaffold and describe plugin extension points.
     Plugin(PluginArgs),
+    /// Export the event catalog as a privacy/compliance manifest.
+    Manifest(ManifestArgs),
 }
 
 /// Arguments for `infergen generate`.
@@ -208,4 +210,29 @@ pub enum PluginKind {
     Adapter,
     /// A language parser — implements `LanguageParser`.
     Parser,
+}
+
+/// Arguments for `infergen manifest`.
+#[derive(Debug, Args)]
+pub struct ManifestArgs {
+    /// Path to the catalog file. Defaults to value from config or `.infergen/catalog.yaml`.
+    #[arg(long)]
+    pub catalog: Option<PathBuf>,
+    /// Write output to this file instead of stdout.
+    #[arg(long, short = 'o')]
+    pub output: Option<PathBuf>,
+    /// Output format (default: json).
+    #[arg(long, value_enum, default_value_t = ManifestFormat::Json)]
+    pub format: ManifestFormat,
+}
+
+/// Output format for `infergen manifest`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ManifestFormat {
+    /// JSON (default, machine-readable).
+    Json,
+    /// YAML (human-readable).
+    Yaml,
+    /// Markdown (audit report).
+    Markdown,
 }

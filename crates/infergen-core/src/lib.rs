@@ -15,6 +15,7 @@ pub mod detect;
 pub mod flow;
 pub mod linter;
 pub mod llm;
+pub mod manifest;
 pub mod monorepo;
 pub mod namer;
 pub mod parser;
@@ -62,6 +63,12 @@ pub use property::{enrich_hints, is_pii_property, type_from_name};
 pub use review::{
     CatalogDiff, DiffEntry, EntryChange, approve, approve_all_proposed, diff_catalogs, ignore,
     remove_property, rename, set_description, upsert_property,
+};
+pub use manifest::{
+    generate_manifest, render_markdown,
+    Manifest, ManifestEvent, ManifestFlow, ManifestProperty,
+    ManifestProvider, ManifestSummary, PiiEntry,
+    MANIFEST_VERSION,
 };
 pub use parser::go::GoParser;
 pub use parser::js::JsParser;
