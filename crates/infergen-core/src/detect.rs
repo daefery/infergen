@@ -55,6 +55,8 @@ pub enum Framework {
     Gin,
     /// Echo.
     Echo,
+    /// Go standard library HTTP package (net/http).
+    NetHttp,
     /// Ruby on Rails.
     Rails,
 }
@@ -190,14 +192,22 @@ fn detect_go(root: &Path, result: &mut DetectionResult) {
         return;
     }
     result.add_language(Language::Go);
+    let mut has_named_framework = false;
     if let Some(text) = read_opt(&go_mod) {
         let text = text.to_lowercase();
         if text.contains("gin-gonic/gin") {
             result.add_framework(Framework::Gin);
+            has_named_framework = true;
         }
         if text.contains("labstack/echo") {
             result.add_framework(Framework::Echo);
+            has_named_framework = true;
         }
+    }
+    // net/http is Go stdlib — present in every Go project even if not in go.mod.
+    // Emit it only when no named HTTP framework was detected, to avoid noise.
+    if !has_named_framework {
+        result.add_framework(Framework::NetHttp);
     }
 }
 
@@ -287,6 +297,43 @@ mod tests {
     }
 
     #[test]
+    fn detects_go_net_http_for_plain_project() {
+        let dir = tempdir().unwrap();
+        write(dir.path(), "go.mod", "module example.com/myapp\n\ngo 1.21\n");
+        let r = detect(dir.path()).unwrap();
+        assert!(r.languages.contains(&Language::Go));
+        assert!(r.frameworks.contains(&Framework::NetHttp));
+        assert!(!r.frameworks.contains(&Framework::Gin));
+        assert!(!r.frameworks.contains(&Framework::Echo));
+    }
+
+    #[test]
+    fn detect_go_gin_suppresses_net_http() {
+        let dir = tempdir().unwrap();
+        write(
+            dir.path(),
+            "go.mod",
+            "module x\n\nrequire github.com/gin-gonic/gin v1.9.0\n",
+        );
+        let r = detect(dir.path()).unwrap();
+        assert!(r.frameworks.contains(&Framework::Gin));
+        assert!(!r.frameworks.contains(&Framework::NetHttp));
+    }
+
+    #[test]
+    fn detect_go_echo_suppresses_net_http() {
+        let dir = tempdir().unwrap();
+        write(
+            dir.path(),
+            "go.mod",
+            "module x\n\nrequire github.com/labstack/echo/v4 v4.11.0\n",
+        );
+        let r = detect(dir.path()).unwrap();
+        assert!(r.frameworks.contains(&Framework::Echo));
+        assert!(!r.frameworks.contains(&Framework::NetHttp));
+    }
+
+    #[test]
     fn detects_ruby_rails() {
         let dir = tempdir().unwrap();
         write(
@@ -331,6 +378,10 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&Framework::NextJs).unwrap(),
             "\"next-js\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Framework::NetHttp).unwrap(),
+            "\"net-http\""
         );
     }
 }

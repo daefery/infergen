@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 
 use crate::{Result, detect::Language};
 
+pub mod go;
 pub mod js;
 pub mod py;
 
@@ -85,6 +86,23 @@ impl ParsedFile {
             f(&stmts)
         } else {
             R::default()
+        }
+    }
+
+    /// Call `f` with the raw Go source text.
+    ///
+    /// Returns `None` when [`self.lang`][ParsedFile::lang] is not
+    /// [`Language::Go`].  Go adapters do text-based pattern matching directly
+    /// on the source string rather than walking a structured AST.
+    #[must_use]
+    pub fn with_go_source<F, R>(&self, f: F) -> Option<R>
+    where
+        F: FnOnce(&str) -> R,
+    {
+        if self.lang == Language::Go {
+            Some(f(&self.source))
+        } else {
+            None
         }
     }
 }
@@ -183,6 +201,40 @@ mod tests {
         };
         let len = f.with_js_program(|prog| prog.body.len());
         assert_eq!(len, Some(1));
+    }
+
+    #[test]
+    fn with_go_source_some_for_go() {
+        let f = ParsedFile {
+            path: PathBuf::from("main.go"),
+            lang: Language::Go,
+            source: "package main\n".to_owned(),
+            diagnostics: vec![],
+        };
+        let len = f.with_go_source(|s| s.len());
+        assert_eq!(len, Some("package main\n".len()));
+    }
+
+    #[test]
+    fn with_go_source_none_for_typescript() {
+        let f = ParsedFile {
+            path: PathBuf::from("app.ts"),
+            lang: Language::TypeScript,
+            source: "const x = 1;".to_owned(),
+            diagnostics: vec![],
+        };
+        assert!(f.with_go_source(|_| ()).is_none());
+    }
+
+    #[test]
+    fn with_go_source_none_for_python() {
+        let f = ParsedFile {
+            path: PathBuf::from("views.py"),
+            lang: Language::Python,
+            source: "pass".to_owned(),
+            diagnostics: vec![],
+        };
+        assert!(f.with_go_source(|_| ()).is_none());
     }
 
     /// Verify the trait is object-safe so it can be used as `dyn LanguageParser`.

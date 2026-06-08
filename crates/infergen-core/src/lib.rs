@@ -20,12 +20,15 @@ pub mod provider;
 pub mod review;
 
 pub use adapter::django::DjangoAdapter;
+pub use adapter::echo::EchoAdapter;
 pub use adapter::fastapi::FastApiAdapter;
 pub use adapter::flask::FlaskAdapter;
+pub use adapter::gin::GinAdapter;
+pub use adapter::nethttp::NetHttpAdapter;
 pub use adapter::nextjs::NextjsAdapter;
 pub use adapter::{Adapter, EventKind, PropertyHint, ProposedEvent};
 pub use catalog::{from_proposals, load_catalog, merge_proposals, rescan_merge, save_catalog};
-pub use codegen::{CodegenConfig, generate_python, generate_typescript};
+pub use codegen::{CodegenConfig, GoCodegenConfig, generate_go, generate_python, generate_typescript};
 pub use config::Config;
 pub use detect::{DetectionResult, Framework, Language, detect};
 pub use infergen_types::{
@@ -39,6 +42,7 @@ pub use review::{
     CatalogDiff, DiffEntry, EntryChange, approve, approve_all_proposed, diff_catalogs, ignore,
     remove_property, rename, set_description, upsert_property,
 };
+pub use parser::go::GoParser;
 pub use parser::js::JsParser;
 pub use parser::py::PyParser;
 pub use provider::{ProviderPlugin, ProviderRegistry, TrackEvent};

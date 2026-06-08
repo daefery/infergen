@@ -10,8 +10,11 @@ use std::path::PathBuf;
 use crate::{detect::Framework, parser::ParsedFile};
 
 pub mod django;
+pub mod echo;
 pub mod fastapi;
 pub mod flask;
+pub mod gin;
+pub mod nethttp;
 pub mod nextjs;
 
 /// Broad category of a proposed tracking moment.
