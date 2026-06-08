@@ -419,6 +419,7 @@ mod tests {
                 line: None,
                 adapter: "nextjs".into(),
             }],
+            package: None,
         }
     }
 

@@ -28,6 +28,7 @@ fn make_entry(id: &str, name: &str, status: EventStatus) -> CatalogEntry {
             line: None,
             adapter: "nextjs".into(),
         }],
+        package: None,
     }
 }
 

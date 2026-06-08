@@ -48,6 +48,7 @@ fn make_entry(name: &str, status: EventStatus) -> CatalogEntry {
         }],
         properties: Vec::new(),
         providers: Vec::new(),
+        package: None,
     }
 }
 

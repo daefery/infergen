@@ -96,6 +96,7 @@ fn proposal_to_entry(proposal: &ProposedEvent, project_root: &Path) -> CatalogEn
         provenance,
         properties,
         providers: Vec::new(),
+        package: None,
     }
 }
 
@@ -428,6 +429,7 @@ mod tests {
             }],
             properties: Vec::new(),
             providers: Vec::new(),
+            package: None,
         }
     }
 

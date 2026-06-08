@@ -13,6 +13,7 @@ pub mod codegen;
 pub mod config;
 pub mod detect;
 pub mod linter;
+pub mod monorepo;
 pub mod namer;
 pub mod parser;
 pub mod property;
@@ -42,6 +43,10 @@ pub use infergen_types::{
     CATALOG_SCHEMA_VERSION,
 };
 pub use linter::{ConventionCase, LintRule, LintViolation, lint_catalog};
+pub use monorepo::{
+    ConsistencyIssue, ConsistencyKind, MonorepoLayout, MonorepoPackage,
+    cross_service_check, detect_monorepo, merge_package_catalogs, namespace_catalog,
+};
 pub use namer::{NameResult, NameSignals, Namer};
 pub use property::{enrich_hints, is_pii_property, type_from_name};
 pub use review::{

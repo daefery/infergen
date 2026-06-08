@@ -10,5 +10,8 @@ description = "Shared, dependency-free domain types for Infergen (catalog schema
 [dependencies]
 serde = { workspace = true }
 
+[dev-dependencies]
+serde_yaml = { workspace = true }
+
 [lints]
 workspace = true
