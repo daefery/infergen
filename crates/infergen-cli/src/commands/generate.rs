@@ -1,8 +1,9 @@
-//! `infergen generate` — TypeScript SDK generation from approved catalog (E2.1 + E2.2).
+//! `infergen generate` — TypeScript + Python SDK generation from approved catalog (E2.1/E5.1).
 
 use anyhow::Context;
 use infergen_core::{
-    Catalog, CodegenConfig, EventStatus, generate_typescript, load_catalog,
+    Catalog, CodegenConfig, EventStatus, generate_python, generate_typescript, load_catalog,
+    detect::{Language, detect},
 };
 
 use crate::cli::GenerateArgs;
@@ -58,5 +59,21 @@ pub fn run(args: GenerateArgs) -> anyhow::Result<()> {
         .with_context(|| format!("writing {}", args.output.display()))?;
 
     println!("infergen: wrote {}  ({} events)", args.output.display(), generated_count);
+
+    // Also generate Python SDK when Python is detected in cwd.
+    if let Ok(cwd) = std::env::current_dir() {
+        if let Ok(detected) = detect(&cwd) {
+            if detected.languages.contains(&Language::Python) {
+                let py_src = generate_python(&catalog, &config);
+                let py_output = cwd.join("infergen_sdk.py");
+                if let Err(e) = std::fs::write(&py_output, &py_src) {
+                    eprintln!("infergen: warning: could not write Python SDK: {e}");
+                } else {
+                    println!("infergen: wrote {}  ({} events)", py_output.display(), generated_count);
+                }
+            }
+        }
+    }
+
     Ok(())
 }

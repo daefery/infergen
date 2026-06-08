@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use crate::{Result, detect::Language};
 
 pub mod js;
+pub mod py;
 
 /// A non-fatal diagnostic emitted during parsing (syntax error or warning).
 ///
@@ -67,6 +68,25 @@ impl ParsedFile {
             None
         }
     }
+
+    /// Scan this file's source as Python and call `f` with the structural
+    /// statements produced by [`py::PyParser::scan`].
+    ///
+    /// Returns `R::default()` when [`self.lang`][ParsedFile::lang] is not
+    /// [`Language::Python`].  The Python "AST" is fully owned — no arena
+    /// lifetime issues.
+    pub fn with_py_ast<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&[py::PyStmt]) -> R,
+        R: Default,
+    {
+        if self.lang == Language::Python {
+            let stmts = py::PyParser::scan(&self.source);
+            f(&stmts)
+        } else {
+            R::default()
+        }
+    }
 }
 
 /// Contract for language parsers.
@@ -122,6 +142,35 @@ mod tests {
             diagnostics: vec![],
         };
         assert!(f.with_js_program(|_| ()).is_none());
+    }
+
+    #[test]
+    fn with_py_ast_default_for_typescript() {
+        let f = ParsedFile {
+            path: PathBuf::from("app.ts"),
+            lang: Language::TypeScript,
+            source: "const x = 1;".to_owned(),
+            diagnostics: vec![],
+        };
+        let count: usize = f.with_py_ast(|stmts| stmts.len());
+        assert_eq!(count, 0); // returns R::default() = 0
+    }
+
+    #[test]
+    fn with_py_ast_scans_python() {
+        let f = ParsedFile {
+            path: PathBuf::from("views.py"),
+            lang: Language::Python,
+            source: "def hello():\n    pass\n".to_owned(),
+            diagnostics: vec![],
+        };
+        let count: usize = f.with_py_ast(|stmts| {
+            stmts
+                .iter()
+                .filter(|s| matches!(s, py::PyStmt::FunctionDef { .. }))
+                .count()
+        });
+        assert_eq!(count, 1);
     }
 
     #[test]
