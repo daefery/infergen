@@ -1,0 +1,35 @@
+schemaVersion: 1
+events:
+  - id: evt_example_0001
+    name: page_viewed
+    status: proposed
+    confidence: 0.9
+    description: "User views a SvelteKit page."
+    adapter: sveltekit
+    properties:
+      - name: page_path
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0002
+    name: form_action_invoked
+    status: proposed
+    confidence: 0.85
+    description: "A SvelteKit form action is invoked."
+    adapter: sveltekit
+    properties:
+      - name: action_name
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0003
+    name: load_error_occurred
+    status: proposed
+    confidence: 0.8
+    description: "A page or layout load function throws an error."
+    adapter: sveltekit
+    properties:
+      - name: status
+        type: number
+        required: true
+        pii: false

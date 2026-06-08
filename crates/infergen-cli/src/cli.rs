@@ -161,6 +161,9 @@ pub struct InitArgs {
     /// Overwrite an existing config file.
     #[arg(long)]
     pub force: bool,
+    /// Skip writing the example `.infergen/catalog.yaml` scaffold.
+    #[arg(long)]
+    pub no_example: bool,
 }
 
 /// On-disk format selectable by `init --format`.

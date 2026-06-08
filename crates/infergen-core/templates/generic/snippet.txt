@@ -1,0 +1,3 @@
+// After `infergen generate`, import or require your typed SDK and call:
+track.pageViewed({ page_path: "/" });
+track.featureUsed({ feature_name: "my_feature" });

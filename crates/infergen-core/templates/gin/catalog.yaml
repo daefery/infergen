@@ -1,0 +1,39 @@
+schemaVersion: 1
+events:
+  - id: evt_example_0001
+    name: http_request_handled
+    status: proposed
+    confidence: 0.9
+    description: "A Gin HTTP handler processes a request."
+    adapter: gin
+    properties:
+      - name: method
+        type: string
+        required: true
+        pii: false
+      - name: path
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0002
+    name: user_authenticated
+    status: proposed
+    confidence: 0.85
+    description: "User is authenticated via a Gin middleware."
+    adapter: gin
+    properties:
+      - name: user_id
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0003
+    name: error_returned
+    status: proposed
+    confidence: 0.8
+    description: "A handler returns an error response."
+    adapter: gin
+    properties:
+      - name: status_code
+        type: number
+        required: true
+        pii: false

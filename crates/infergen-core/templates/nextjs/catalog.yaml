@@ -1,0 +1,39 @@
+schemaVersion: 1
+events:
+  - id: evt_example_0001
+    name: page_viewed
+    status: proposed
+    confidence: 0.9
+    description: "User views a page."
+    adapter: nextjs
+    properties:
+      - name: page_path
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0002
+    name: user_signup_completed
+    status: proposed
+    confidence: 0.85
+    description: "User completes the signup flow."
+    adapter: nextjs
+    properties:
+      - name: method
+        type: string
+        required: true
+        pii: false
+      - name: email
+        type: string
+        required: false
+        pii: true
+  - id: evt_example_0003
+    name: button_clicked
+    status: proposed
+    confidence: 0.6
+    description: "User clicks an interactive button."
+    adapter: nextjs
+    properties:
+      - name: label
+        type: string
+        required: false
+        pii: false
