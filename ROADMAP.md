@@ -82,7 +82,7 @@ Goal: deliver on the "any project, any stack" promise.
 | E5.2 | Go Parser & Adapters | Done | `go/ast` parser; adapters for Gin, Echo, net/http. Go codegen + runtime SDK. | Depends on E0.3, E2.1. |
 | E5.3 | Ruby Parser & Adapters | Done | Prism parser; Rails adapter (routes, controllers, Devise). Ruby codegen + runtime SDK. | Depends on E0.3, E2.1. |
 | E5.4 | Additional JS Frameworks | Done | Adapters for React Router, Vue/Nuxt, SvelteKit, Express, NestJS beyond the Next.js slice. | Depends on E0.4. |
-| E5.5 | Monorepo / Polyglot Catalog | Planned | One catalog namespaced per package across mixed-language repos. Cross-service event consistency. | Depends on E5.1–E5.4. |
+| E5.5 | Monorepo / Polyglot Catalog | Done | One catalog namespaced per package across mixed-language repos. Cross-service event consistency. | Depends on E5.1–E5.4. |
 
 ---
 
