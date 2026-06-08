@@ -12,6 +12,7 @@ use crate::{Result, detect::Language};
 pub mod go;
 pub mod js;
 pub mod py;
+pub mod ruby;
 
 /// A non-fatal diagnostic emitted during parsing (syntax error or warning).
 ///
@@ -103,6 +104,25 @@ impl ParsedFile {
             Some(f(&self.source))
         } else {
             None
+        }
+    }
+
+    /// Scan this file's source as Ruby and call `f` with the structural
+    /// statements produced by [`ruby::RubyParser::scan`].
+    ///
+    /// Returns `R::default()` when [`self.lang`][ParsedFile::lang] is not
+    /// [`Language::Ruby`].  The Ruby statements are fully owned — no arena
+    /// lifetime issues.
+    pub fn with_ruby_stmts<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&[ruby::RubyStmt]) -> R,
+        R: Default,
+    {
+        if self.lang == Language::Ruby {
+            let stmts = ruby::RubyParser::scan(&self.source);
+            f(&stmts)
+        } else {
+            R::default()
         }
     }
 }

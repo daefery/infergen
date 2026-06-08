@@ -16,6 +16,7 @@ pub mod flask;
 pub mod gin;
 pub mod nethttp;
 pub mod nextjs;
+pub mod rails;
 
 /// Broad category of a proposed tracking moment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
