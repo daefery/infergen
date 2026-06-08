@@ -32,6 +32,8 @@ pub enum Commands {
     Watch(WatchArgs),
     /// Review and annotate the event catalog.
     Review(ReviewArgs),
+    /// Generate an offline HTML catalog viewer and open it in the browser.
+    View(ViewArgs),
 }
 
 /// Arguments for `infergen generate`.
@@ -126,6 +128,21 @@ pub enum ReviewAction {
         /// Path to the proposed catalog (output of `infergen scan`).
         proposed: PathBuf,
     },
+}
+
+/// Arguments for `infergen view`.
+#[derive(Debug, Args)]
+pub struct ViewArgs {
+    /// Path to the catalog file.
+    #[arg(long, default_value = DEFAULT_CATALOG)]
+    pub catalog: PathBuf,
+    /// Output path for the generated HTML file.
+    /// Defaults to `catalog-viewer.html` in the same directory as the catalog.
+    #[arg(long)]
+    pub output: Option<PathBuf>,
+    /// Do not auto-open the HTML file in the default browser.
+    #[arg(long)]
+    pub no_open: bool,
 }
 
 /// Arguments for `infergen init`.

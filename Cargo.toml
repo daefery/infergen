@@ -24,6 +24,8 @@ toml       = "0.8"
 serde_yaml = "0.9"
 # Synchronous HTTP client for LLM provider backends (E6.1).
 ureq       = { version = "2", features = ["native-tls", "json"] }
+# Cross-platform browser/file opener for catalog web viewer (E7.1).
+open       = "5"
 # Dev-only (testing): temp dirs for config/detection/integration tests.
 tempfile   = "3"
 # OXC: TS/JS AST parser (E0.3). All sub-crates must share the same version.
