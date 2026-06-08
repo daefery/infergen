@@ -4,8 +4,8 @@ use std::path::Path;
 
 use anyhow::Context;
 use infergen_core::{
-    Catalog, CatalogEventKind, EntryChange, EventStatus, approve, diff_catalogs, ignore,
-    load_catalog, rename, save_catalog, set_description,
+    Catalog, CatalogEventKind, EntryChange, EventStatus, approve, approve_all_proposed,
+    diff_catalogs, ignore, load_catalog, rename, save_catalog, set_description,
 };
 use infergen_core::CATALOG_SCHEMA_VERSION;
 
@@ -18,10 +18,17 @@ use crate::cli::{ReviewAction, ReviewArgs};
 pub fn run(args: ReviewArgs) -> anyhow::Result<()> {
     match args.action {
         ReviewAction::List { status } => list(&args.catalog, &status),
-        ReviewAction::Approve { id } => mutate_catalog(&args.catalog, |cat| {
-            let name = event_name(cat, &id);
-            approve(cat, &id)?;
-            println!("ok: {id} ({name}) → approved");
+        ReviewAction::Approve { id, all } => mutate_catalog(&args.catalog, |cat| {
+            if all {
+                let n = approve_all_proposed(cat);
+                println!("ok: {n} proposed event(s) → approved");
+            } else if let Some(id) = id {
+                let name = event_name(cat, &id);
+                approve(cat, &id)?;
+                println!("ok: {id} ({name}) → approved");
+            } else {
+                anyhow::bail!("provide an event ID or use --all");
+            }
             Ok(())
         }),
         ReviewAction::Ignore { id } => mutate_catalog(&args.catalog, |cat| {
@@ -219,6 +226,8 @@ fn kind_str(k: CatalogEventKind) -> &'static str {
         CatalogEventKind::ApiCall => "apiCall",
         CatalogEventKind::AuthEvent => "authEvent",
         CatalogEventKind::FormSubmit => "formSubmit",
+        CatalogEventKind::ButtonClick => "buttonClick",
+        CatalogEventKind::Search => "search",
         CatalogEventKind::Error => "error",
     }
 }

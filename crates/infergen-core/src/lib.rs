@@ -33,8 +33,8 @@ pub use linter::{ConventionCase, LintRule, LintViolation, lint_catalog};
 pub use namer::{NameResult, NameSignals, Namer};
 pub use property::{enrich_hints, is_pii_property, type_from_name};
 pub use review::{
-    CatalogDiff, DiffEntry, EntryChange, approve, diff_catalogs, ignore, remove_property, rename,
-    set_description, upsert_property,
+    CatalogDiff, DiffEntry, EntryChange, approve, approve_all_proposed, diff_catalogs, ignore,
+    remove_property, rename, set_description, upsert_property,
 };
 pub use parser::js::JsParser;
 pub use provider::{ProviderPlugin, ProviderRegistry, TrackEvent};
