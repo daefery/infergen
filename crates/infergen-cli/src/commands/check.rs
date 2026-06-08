@@ -30,13 +30,21 @@ pub struct CheckReport {
     pub violations: Vec<ViolationRef>,
 }
 
-/// Minimal event reference: ID + name.
+/// Minimal event reference: ID + name + source location.
 #[derive(Debug, Serialize)]
 pub struct EventRef {
     /// Stable event ID (e.g. `evt_0123456789abcdef`).
     pub id: String,
     /// Human-readable event name.
     pub name: String,
+    /// Source file path relative to the project root (from provenance\[0\]).
+    /// Omitted from JSON when empty.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub source_path: String,
+    /// Source line number (1-based), if the adapter recorded one.
+    /// Omitted from JSON when absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line: Option<u32>,
 }
 
 /// A naming convention violation.
@@ -157,11 +165,29 @@ pub fn run(args: CheckArgs) -> anyhow::Result<()> {
             issue_count,
             new_untracked: new_untracked
                 .iter()
-                .map(|e| EventRef { id: e.id.clone(), name: e.name.clone() })
+                .map(|e| EventRef {
+                    id: e.id.clone(),
+                    name: e.name.clone(),
+                    source_path: e
+                        .provenance
+                        .first()
+                        .map(|p| p.source_path.clone())
+                        .unwrap_or_default(),
+                    line: e.provenance.first().and_then(|p| p.line),
+                })
                 .collect(),
             unreviewed: unreviewed
                 .iter()
-                .map(|e| EventRef { id: e.id.clone(), name: e.name.clone() })
+                .map(|e| EventRef {
+                    id: e.id.clone(),
+                    name: e.name.clone(),
+                    source_path: e
+                        .provenance
+                        .first()
+                        .map(|p| p.source_path.clone())
+                        .unwrap_or_default(),
+                    line: e.provenance.first().and_then(|p| p.line),
+                })
                 .collect(),
             violations: violations
                 .iter()
@@ -187,7 +213,16 @@ pub fn run(args: CheckArgs) -> anyhow::Result<()> {
             new_untracked.len()
         );
         for e in &new_untracked {
-            println!("  + {} ({})", e.name, e.id);
+            if e.provenance.is_empty() {
+                println!("  + {} ({})", e.name, e.id);
+            } else {
+                let prov = &e.provenance[0];
+                let loc = prov.line.map_or_else(
+                    || prov.source_path.clone(),
+                    |l| format!("{}:{}", prov.source_path, l),
+                );
+                println!("  + {} ({}) — {}", e.name, e.id, loc);
+            }
         }
     }
 
