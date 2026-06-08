@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::Error;
 use crate::detect::{Framework, Language};
+use crate::llm::config::LlmConfig;
 
 /// Candidate config filenames, in discovery precedence order.
 pub const CONFIG_FILENAMES: &[&str] = &["infergen.config.json", "infergen.config.toml"];
@@ -40,7 +41,7 @@ impl ConfigFormat {
 /// Field order is TOML-safe: scalars and arrays precede the `naming` table and
 /// the `providers` array-of-tables, so `toml::to_string_pretty` never nests a
 /// later scalar under an earlier table.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     /// Config-file schema version (see [`crate::CONFIG_SCHEMA_VERSION`]).
@@ -64,6 +65,9 @@ pub struct Config {
     /// Configured destinations/providers (empty until Milestone 3).
     #[serde(default)]
     pub providers: Vec<ProviderConfig>,
+    /// Optional LLM refinement pass (E6.1).  `None` means disabled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub llm: Option<LlmConfig>,
 }
 
 /// Naming convention for generated event names.
@@ -130,6 +134,7 @@ impl Default for Config {
             frameworks: Vec::new(),
             naming: NamingConfig::default(),
             providers: Vec::new(),
+            llm: None,
         }
     }
 }
@@ -324,5 +329,57 @@ mod tests {
         let c = ProviderConfig { name: "console".to_string(), ..Default::default() };
         let s = serde_json::to_string(&c).unwrap();
         assert!(!s.contains("config"), "empty config map should be omitted");
+    }
+
+    // --- LLM config integration tests (E6.1) --------------------------------
+
+    #[test]
+    fn config_default_has_no_llm() {
+        assert!(Config::default().llm.is_none());
+    }
+
+    #[test]
+    fn config_without_llm_field_still_parses() {
+        let c: Config = serde_json::from_str("{}").unwrap();
+        assert!(c.llm.is_none());
+    }
+
+    #[test]
+    fn config_llm_none_omitted_from_json() {
+        let s = serde_json::to_string(&Config::default()).unwrap();
+        assert!(!s.contains("\"llm\""), "llm field should be absent when None");
+    }
+
+    #[test]
+    fn config_with_llm_roundtrips_json() {
+        use crate::llm::config::{LlmConfig, LlmProviderKind};
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("infergen.config.json");
+        let mut c = Config::default();
+        c.llm = Some(LlmConfig {
+            enabled: true,
+            provider: LlmProviderKind::Anthropic,
+            api_key: Some("sk-test".into()),
+            ..Default::default()
+        });
+        c.save(&path).unwrap();
+        let loaded = Config::load(&path).unwrap();
+        assert_eq!(loaded.llm, c.llm);
+    }
+
+    #[test]
+    fn config_with_llm_roundtrips_toml() {
+        use crate::llm::config::{LlmConfig, LlmProviderKind};
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("infergen.config.toml");
+        let mut c = Config::default();
+        c.llm = Some(LlmConfig {
+            enabled: true,
+            provider: LlmProviderKind::Ollama,
+            ..Default::default()
+        });
+        c.save(&path).unwrap();
+        let loaded = Config::load(&path).unwrap();
+        assert_eq!(loaded.llm, c.llm);
     }
 }
