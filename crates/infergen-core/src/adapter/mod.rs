@@ -24,7 +24,8 @@ pub mod svelte_kit;
 pub mod vue;
 
 /// Broad category of a proposed tracking moment.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum EventKind {
     /// User navigated to a page / screen.
     PageView,
@@ -43,7 +44,7 @@ pub enum EventKind {
 }
 
 /// A candidate event property hinted by the adapter.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PropertyHint {
     /// Suggested property name (snake_case preferred; E1.3 normalises).
     pub name: String,
@@ -60,7 +61,7 @@ pub struct PropertyHint {
 ///
 /// This is **not** a catalog entry — it is a pre-review proposal. The catalog
 /// schema (E1.1) defines the persistent format after a human approves/edits.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ProposedEvent {
     /// Heuristic event name. Not yet convention-enforced (E1.3). Reviewers may
     /// rename freely.
@@ -124,7 +125,10 @@ impl ProposedEvent {
 /// Adapters are **infallible**: they return an empty `Vec` when nothing is
 /// detected rather than propagating errors. I/O (reading files from disk)
 /// happens outside the adapter — it receives an already-parsed [`ParsedFile`].
-pub trait Adapter {
+///
+/// The `Send + Sync` supertrait is required so adapters can be shared across
+/// rayon threads in the parallel scan loop (E8.1).
+pub trait Adapter: Send + Sync {
     /// Analyse `file` and return zero or more proposed events.
     fn analyze(&self, file: &ParsedFile) -> Vec<ProposedEvent>;
     /// The framework this adapter targets.
@@ -204,5 +208,35 @@ mod tests {
             .with_adapter("nextjs");
         assert_eq!(e.adapter, "nextjs");
         assert_eq!(e.properties.len(), 1);
+    }
+
+    #[test]
+    fn event_kind_serializes_to_camel_case() {
+        let json = serde_json::to_string(&EventKind::PageView).unwrap();
+        assert_eq!(json, r#""pageView""#);
+        let json2 = serde_json::to_string(&EventKind::AuthEvent).unwrap();
+        assert_eq!(json2, r#""authEvent""#);
+    }
+
+    #[test]
+    fn proposed_event_json_roundtrip() {
+        let e = ProposedEvent::new("user_signed_in", EventKind::AuthEvent, "src/auth.ts", 0.9)
+            .with_prop("email", Some("string"))
+            .with_adapter("nextjs");
+        let json = serde_json::to_string(&e).unwrap();
+        let back: ProposedEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.name, e.name);
+        assert_eq!(back.kind, e.kind);
+        assert_eq!(back.confidence, e.confidence);
+        assert_eq!(back.adapter, e.adapter);
+        assert_eq!(back.properties.len(), 1);
+    }
+
+    #[test]
+    fn property_hint_json_roundtrip() {
+        let h = PropertyHint { name: "email".into(), type_hint: Some("string".into()), pii_hint: true };
+        let json = serde_json::to_string(&h).unwrap();
+        let back: PropertyHint = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, h);
     }
 }
