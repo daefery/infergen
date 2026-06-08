@@ -9,6 +9,9 @@ use std::path::PathBuf;
 
 use crate::{detect::Framework, parser::ParsedFile};
 
+pub mod django;
+pub mod fastapi;
+pub mod flask;
 pub mod nextjs;
 
 /// Broad category of a proposed tracking moment.
