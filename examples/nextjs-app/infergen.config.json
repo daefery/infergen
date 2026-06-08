@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "catalog": ".infergen/catalog.yaml",
+  "output": "infergen/generated",
+  "languages": ["TypeScript"],
+  "frameworks": ["NextJs"],
+  "naming": {
+    "convention": "entity.action.state",
+    "case": "snake_case"
+  },
+  "providers": []
+}

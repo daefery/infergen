@@ -1,0 +1,35 @@
+schemaVersion: 1
+events:
+  - id: evt_example_0001
+    name: page_viewed
+    status: proposed
+    confidence: 0.9
+    description: "User views a Vue route."
+    adapter: vue
+    properties:
+      - name: route_name
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0002
+    name: form_submitted
+    status: proposed
+    confidence: 0.8
+    description: "User submits a form component."
+    adapter: vue
+    properties:
+      - name: form_id
+        type: string
+        required: false
+        pii: false
+  - id: evt_example_0003
+    name: component_clicked
+    status: proposed
+    confidence: 0.6
+    description: "User clicks an interactive component."
+    adapter: vue
+    properties:
+      - name: component_name
+        type: string
+        required: false
+        pii: false

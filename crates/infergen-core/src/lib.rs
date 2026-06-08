@@ -22,6 +22,7 @@ pub mod property;
 pub mod provider;
 pub mod quality;
 pub mod review;
+pub mod templates;
 
 pub use adapter::django::DjangoAdapter;
 pub use adapter::echo::EchoAdapter;
@@ -70,6 +71,7 @@ pub use parser::svelte::SvelteParser;
 pub use parser::vue::VueParser;
 pub use provider::{ProviderPlugin, ProviderRegistry, TrackEvent};
 pub use parser::{Diagnostic, LanguageParser, ParsedFile};
+pub use templates::{StackTemplate, template_for_frameworks};
 
 /// Version of the on-disk project config (`infergen.config.*`) schema.
 ///

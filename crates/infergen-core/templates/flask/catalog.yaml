@@ -1,0 +1,39 @@
+schemaVersion: 1
+events:
+  - id: evt_example_0001
+    name: route_accessed
+    status: proposed
+    confidence: 0.9
+    description: "A Flask route is accessed."
+    adapter: flask
+    properties:
+      - name: endpoint
+        type: string
+        required: true
+        pii: false
+      - name: method
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0002
+    name: user_logged_in
+    status: proposed
+    confidence: 0.85
+    description: "User logs in via Flask-Login."
+    adapter: flask
+    properties:
+      - name: user_id
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0003
+    name: error_handled
+    status: proposed
+    confidence: 0.8
+    description: "Flask error handler is invoked."
+    adapter: flask
+    properties:
+      - name: status_code
+        type: number
+        required: true
+        pii: false

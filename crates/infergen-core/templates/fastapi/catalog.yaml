@@ -1,0 +1,39 @@
+schemaVersion: 1
+events:
+  - id: evt_example_0001
+    name: endpoint_called
+    status: proposed
+    confidence: 0.9
+    description: "A FastAPI endpoint is called."
+    adapter: fastapi
+    properties:
+      - name: path
+        type: string
+        required: true
+        pii: false
+      - name: method
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0002
+    name: user_registered
+    status: proposed
+    confidence: 0.85
+    description: "A new user is registered via the API."
+    adapter: fastapi
+    properties:
+      - name: user_id
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0003
+    name: validation_error_raised
+    status: proposed
+    confidence: 0.8
+    description: "A Pydantic validation error is raised."
+    adapter: fastapi
+    properties:
+      - name: field
+        type: string
+        required: false
+        pii: false

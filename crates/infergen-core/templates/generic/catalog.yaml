@@ -1,0 +1,24 @@
+schemaVersion: 1
+events:
+  - id: evt_example_0001
+    name: page_viewed
+    status: proposed
+    confidence: 0.9
+    description: "User views a page or screen."
+    adapter: generic
+    properties:
+      - name: page_path
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0002
+    name: feature_used
+    status: proposed
+    confidence: 0.75
+    description: "User interacts with a feature."
+    adapter: generic
+    properties:
+      - name: feature_name
+        type: string
+        required: true
+        pii: false

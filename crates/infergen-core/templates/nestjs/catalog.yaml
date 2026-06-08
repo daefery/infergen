@@ -1,0 +1,39 @@
+schemaVersion: 1
+events:
+  - id: evt_example_0001
+    name: http_request_handled
+    status: proposed
+    confidence: 0.9
+    description: "NestJS controller handles an HTTP request."
+    adapter: nestjs
+    properties:
+      - name: controller
+        type: string
+        required: true
+        pii: false
+      - name: method
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0002
+    name: user_created
+    status: proposed
+    confidence: 0.85
+    description: "A new user entity is created."
+    adapter: nestjs
+    properties:
+      - name: role
+        type: string
+        required: false
+        pii: false
+  - id: evt_example_0003
+    name: exception_thrown
+    status: proposed
+    confidence: 0.8
+    description: "An exception is thrown within a service or controller."
+    adapter: nestjs
+    properties:
+      - name: exception_type
+        type: string
+        required: true
+        pii: false

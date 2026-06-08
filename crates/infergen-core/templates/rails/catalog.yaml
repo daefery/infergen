@@ -1,0 +1,39 @@
+schemaVersion: 1
+events:
+  - id: evt_example_0001
+    name: controller_action_called
+    status: proposed
+    confidence: 0.9
+    description: "A Rails controller action is called."
+    adapter: rails
+    properties:
+      - name: controller
+        type: string
+        required: true
+        pii: false
+      - name: action
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0002
+    name: user_signed_in
+    status: proposed
+    confidence: 0.85
+    description: "User signs in via Devise."
+    adapter: rails
+    properties:
+      - name: user_id
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0003
+    name: model_created
+    status: proposed
+    confidence: 0.75
+    description: "An ActiveRecord model is created."
+    adapter: rails
+    properties:
+      - name: model_class
+        type: string
+        required: true
+        pii: false

@@ -1,0 +1,43 @@
+schemaVersion: 1
+events:
+  - id: evt_example_0001
+    name: api_request_received
+    status: proposed
+    confidence: 0.9
+    description: "An HTTP request is received by the API."
+    adapter: express
+    properties:
+      - name: method
+        type: string
+        required: true
+        pii: false
+      - name: path
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0002
+    name: user_login_attempted
+    status: proposed
+    confidence: 0.85
+    description: "User attempts to log in."
+    adapter: express
+    properties:
+      - name: success
+        type: boolean
+        required: true
+        pii: false
+  - id: evt_example_0003
+    name: error_occurred
+    status: proposed
+    confidence: 0.8
+    description: "An unhandled error occurred."
+    adapter: express
+    properties:
+      - name: status_code
+        type: number
+        required: true
+        pii: false
+      - name: message
+        type: string
+        required: false
+        pii: false
