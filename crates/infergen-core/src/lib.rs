@@ -8,6 +8,7 @@
 use std::path::PathBuf;
 
 pub mod adapter;
+pub mod cache;
 pub mod catalog;
 pub mod codegen;
 pub mod config;
@@ -15,6 +16,7 @@ pub mod detect;
 pub mod flow;
 pub mod linter;
 pub mod llm;
+pub mod migration;
 pub mod manifest;
 pub mod monorepo;
 pub mod namer;
@@ -41,6 +43,7 @@ pub use adapter::svelte_kit::SvelteKitAdapter;
 pub use adapter::vue::VueAdapter;
 pub use adapter::{Adapter, EventKind, PropertyHint, ProposedEvent};
 pub use catalog::{assign_flows, from_proposals, load_catalog, merge_proposals, rescan_merge, save_catalog};
+pub use migration::migrate_catalog;
 pub use flow::{DetectedFlow, DetectedStep, FlowDetector};
 pub use flow::refiner::SemanticRefiner;
 pub use infergen_types::{EventFlow, FlowKind, FlowStep};
@@ -70,6 +73,10 @@ pub use manifest::{
     Manifest, ManifestEvent, ManifestFlow, ManifestProperty,
     ManifestProvider, ManifestSummary, PiiEntry,
     MANIFEST_VERSION,
+};
+pub use cache::{
+    CacheEntry, ScanCache, CACHE_VERSION,
+    cache_path, file_mtime, fnv1a_hash, load_cache, normalize_path, save_cache,
 };
 pub use parser::go::GoParser;
 pub use parser::js::JsParser;
