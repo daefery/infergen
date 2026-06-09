@@ -8,6 +8,7 @@
 use std::path::PathBuf;
 
 pub mod adapter;
+pub mod cache;
 pub mod catalog;
 pub mod codegen;
 pub mod config;
@@ -72,6 +73,10 @@ pub use manifest::{
     Manifest, ManifestEvent, ManifestFlow, ManifestProperty,
     ManifestProvider, ManifestSummary, PiiEntry,
     MANIFEST_VERSION,
+};
+pub use cache::{
+    CacheEntry, ScanCache, CACHE_VERSION,
+    cache_path, file_mtime, fnv1a_hash, load_cache, normalize_path, save_cache,
 };
 pub use parser::go::GoParser;
 pub use parser::js::JsParser;

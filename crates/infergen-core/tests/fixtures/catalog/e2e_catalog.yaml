@@ -1,0 +1,106 @@
+schemaVersion: 1
+events:
+  - id: "evt_0000000000000001"
+    name: "page_viewed"
+    description: "User viewed a page in the application."
+    status: approved
+    confidence: 0.9
+    kind: pageView
+    provenance:
+      - sourcePath: "src/pages/index.tsx"
+        adapter: "nextjs"
+    properties:
+      - name: page_path
+        type: string
+        required: true
+        pii: false
+      - name: referrer
+        type: string
+        required: false
+        pii: false
+    providers: []
+    package: null
+    flowIds: []
+  - id: "evt_0000000000000002"
+    name: "user_signed_in"
+    description: "User successfully authenticated."
+    status: approved
+    confidence: 0.85
+    kind: authEvent
+    provenance:
+      - sourcePath: "src/pages/api/auth.ts"
+        adapter: "nextjs"
+    properties:
+      - name: email
+        type: string
+        required: true
+        pii: true
+      - name: method
+        type: string
+        required: false
+        pii: false
+    providers: []
+    package: null
+    flowIds: []
+  - id: "evt_0000000000000003"
+    name: "product_added_to_cart"
+    description: "User added a product to their shopping cart."
+    status: approved
+    confidence: 0.9
+    kind: buttonClick
+    provenance:
+      - sourcePath: "src/components/ProductCard.tsx"
+        adapter: "nextjs"
+    properties:
+      - name: product_id
+        type: string
+        required: true
+        pii: false
+      - name: price
+        type: number
+        required: true
+        pii: false
+      - name: quantity
+        type: number
+        required: false
+        pii: false
+    providers: []
+    package: null
+    flowIds: []
+  - id: "evt_0000000000000004"
+    name: "checkout_completed"
+    description: "User completed the checkout flow."
+    status: approved
+    confidence: 0.9
+    kind: apiCall
+    provenance:
+      - sourcePath: "src/pages/api/checkout.ts"
+        adapter: "nextjs"
+    properties:
+      - name: order_id
+        type: string
+        required: true
+        pii: false
+      - name: total
+        type: number
+        required: true
+        pii: false
+      - name: currency
+        type: string
+        required: false
+        pii: false
+    providers: []
+    package: null
+    flowIds: []
+  - id: "evt_0000000000000005"
+    name: "noise_event"
+    description: "Internal system event, not for tracking."
+    status: ignored
+    confidence: 0.3
+    kind: pageView
+    provenance: []
+    properties: []
+    providers: []
+    package: null
+    flowIds: []
+flows: []

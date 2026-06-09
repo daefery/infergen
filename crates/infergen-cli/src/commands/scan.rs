@@ -1,11 +1,14 @@
-//! `infergen scan` — discover source files, run adapters, merge into catalog (E4.1/E5.1).
+//! `infergen scan` — discover source files, run adapters, merge into catalog (E4.1/E5.1/E8.1).
 
 use std::path::{Path, PathBuf};
 
+use rayon::prelude::*;
+
 use infergen_core::{
-    Config, DjangoAdapter, EventKind, FastApiAdapter, FlaskAdapter, FeedbackStore, FlowDetector,
-    JsParser, NextjsAdapter, PyParser,
+    CacheEntry, Config, DjangoAdapter, EventKind, FastApiAdapter, FlaskAdapter, FeedbackStore,
+    FlowDetector, JsParser, NextjsAdapter, PyParser, ScanCache,
     adapter::Adapter,
+    cache::{cache_path, file_mtime, fnv1a_hash, load_cache, normalize_path, save_cache},
     catalog::{assign_flows, from_proposals, load_catalog, rescan_merge, save_catalog},
     detect::{Framework, Language, detect},
     parser::LanguageParser,
@@ -89,47 +92,178 @@ pub fn run() -> anyhow::Result<()> {
 
     let mut all_proposals = Vec::new();
 
-    // --- JS/TS scan (Next.js adapter) ----------------------------------------
+    // Set up incremental scan cache (E8.1).
+    let catalog_path = cwd.join(&config.catalog);
+    let cache_file_path = cache_path(&catalog_path);
+    let mut cache = load_cache(&cache_file_path);
+    let mut cache_dirty = false;
+
+    // --- JS/TS scan (Next.js adapter, parallelised E8.1) ---------------------
     let js_files = collect_js_files(&cwd);
     if !js_files.is_empty() {
         println!("scan: {} JS/TS files", js_files.len());
-        let parser = JsParser;
+        let adapter = NextjsAdapter::new(&cwd);
+
+        // Phase 1 (sequential): check mtime → split into cache-hits and stale.
+        let mut js_cached: Vec<infergen_core::adapter::ProposedEvent> = Vec::new();
+        let mut js_stale: Vec<(PathBuf, String)> = Vec::new();
+
         for file_path in &js_files {
-            let Ok(source) = std::fs::read_to_string(file_path) else { continue };
-            let Ok(parsed) = parser.parse(file_path, &source) else { continue };
-            let adapter = NextjsAdapter::new(&cwd);
-            all_proposals.extend(adapter.analyze(&parsed));
+            let rel = normalize_path(file_path, &cwd);
+            let mtime = file_mtime(file_path).unwrap_or(0);
+            if let Some(entry) = cache.get(&rel) {
+                if mtime == entry.modified_secs {
+                    js_cached.extend(entry.proposals.iter().cloned());
+                    continue;
+                }
+            }
+            js_stale.push((file_path.clone(), rel));
         }
+
+        // Phase 2 (parallel): re-parse stale files.
+        let js_fresh: Vec<(String, u64, u64, Vec<infergen_core::adapter::ProposedEvent>)> =
+            js_stale
+                .par_iter()
+                .map(|(file_path, rel)| {
+                    let Ok(source) = std::fs::read_to_string(file_path) else {
+                        return (rel.clone(), 0u64, 0u64, vec![]);
+                    };
+                    let content_hash = fnv1a_hash(source.as_bytes());
+
+                    // Secondary hit: mtime changed but content identical (e.g. `touch`).
+                    if let Some(cached) = cache.get(rel.as_str()) {
+                        if content_hash == cached.content_hash {
+                            let mtime = file_mtime(file_path).unwrap_or(0);
+                            return (rel.clone(), mtime, content_hash, cached.proposals.clone());
+                        }
+                    }
+
+                    // Full re-parse + analyze.
+                    let Ok(parsed) = JsParser.parse(file_path, &source) else {
+                        return (rel.clone(), file_mtime(file_path).unwrap_or(0), content_hash, vec![]);
+                    };
+                    let proposals = adapter.analyze(&parsed);
+                    let mtime = file_mtime(file_path).unwrap_or(0);
+                    (rel.clone(), mtime, content_hash, proposals)
+                })
+                .collect();
+
+        // Phase 3 (sequential): update cache, merge proposals.
+        for (rel, mtime, content_hash, proposals) in js_fresh {
+            if content_hash != 0 {
+                cache.insert(
+                    rel,
+                    CacheEntry {
+                        modified_secs: mtime,
+                        content_hash,
+                        proposals: proposals.clone(),
+                    },
+                );
+                cache_dirty = true;
+            }
+            all_proposals.extend(proposals);
+        }
+        all_proposals.extend(js_cached);
     }
 
-    // --- Python scan ---------------------------------------------------------
+    // --- Python scan (parallelised E8.1) -------------------------------------
     if detected.languages.contains(&Language::Python) {
         let py_files = collect_py_files(&cwd);
         if !py_files.is_empty() {
             println!("scan: {} Python files", py_files.len());
-            let py_adapter: Box<dyn Adapter> =
-                if detected.frameworks.contains(&Framework::FastApi) {
-                    Box::new(FastApiAdapter::new(&cwd))
-                } else if detected.frameworks.contains(&Framework::Django) {
-                    Box::new(DjangoAdapter::new(&cwd))
-                } else if detected.frameworks.contains(&Framework::Flask) {
-                    Box::new(FlaskAdapter::new(&cwd))
-                } else {
-                    // Generic Python: use FastAPI adapter as widest net.
-                    Box::new(FastApiAdapter::new(&cwd))
-                };
 
-            let py_parser = PyParser;
+            // Resolve which adapter to use; each rayon thread creates its own instance.
+            let py_framework = if detected.frameworks.contains(&Framework::FastApi) {
+                Framework::FastApi
+            } else if detected.frameworks.contains(&Framework::Django) {
+                Framework::Django
+            } else if detected.frameworks.contains(&Framework::Flask) {
+                Framework::Flask
+            } else {
+                Framework::FastApi
+            };
+
+            // Phase 1: mtime cache check.
+            let mut py_cached: Vec<infergen_core::adapter::ProposedEvent> = Vec::new();
+            let mut py_stale: Vec<(PathBuf, String)> = Vec::new();
+
             for file_path in &py_files {
-                let Ok(source) = std::fs::read_to_string(file_path) else { continue };
-                let Ok(parsed) = py_parser.parse(file_path, &source) else { continue };
-                all_proposals.extend(py_adapter.analyze(&parsed));
+                let rel = normalize_path(file_path, &cwd);
+                let mtime = file_mtime(file_path).unwrap_or(0);
+                if let Some(entry) = cache.get(&rel) {
+                    if mtime == entry.modified_secs {
+                        py_cached.extend(entry.proposals.iter().cloned());
+                        continue;
+                    }
+                }
+                py_stale.push((file_path.clone(), rel));
             }
+
+            // Phase 2: parallel re-parse. Each thread creates its own adapter
+            // instance (cheap — just a PathBuf clone).
+            let py_fresh: Vec<(String, u64, u64, Vec<infergen_core::adapter::ProposedEvent>)> =
+                py_stale
+                    .par_iter()
+                    .map(|(file_path, rel)| {
+                        let Ok(source) = std::fs::read_to_string(file_path) else {
+                            return (rel.clone(), 0u64, 0u64, vec![]);
+                        };
+                        let content_hash = fnv1a_hash(source.as_bytes());
+
+                        if let Some(cached) = cache.get(rel.as_str()) {
+                            if content_hash == cached.content_hash {
+                                let mtime = file_mtime(file_path).unwrap_or(0);
+                                return (rel.clone(), mtime, content_hash, cached.proposals.clone());
+                            }
+                        }
+
+                        let py_adapter: Box<dyn Adapter> = match py_framework {
+                            Framework::FastApi => Box::new(FastApiAdapter::new(&cwd)),
+                            Framework::Django => Box::new(DjangoAdapter::new(&cwd)),
+                            Framework::Flask => Box::new(FlaskAdapter::new(&cwd)),
+                            _ => Box::new(FastApiAdapter::new(&cwd)),
+                        };
+                        let Ok(parsed) = PyParser.parse(file_path, &source) else {
+                            return (
+                                rel.clone(),
+                                file_mtime(file_path).unwrap_or(0),
+                                content_hash,
+                                vec![],
+                            );
+                        };
+                        let proposals = py_adapter.analyze(&parsed);
+                        let mtime = file_mtime(file_path).unwrap_or(0);
+                        (rel.clone(), mtime, content_hash, proposals)
+                    })
+                    .collect();
+
+            // Phase 3: update cache, merge proposals.
+            for (rel, mtime, content_hash, proposals) in py_fresh {
+                if content_hash != 0 {
+                    cache.insert(
+                        rel,
+                        CacheEntry {
+                            modified_secs: mtime,
+                            content_hash,
+                            proposals: proposals.clone(),
+                        },
+                    );
+                    cache_dirty = true;
+                }
+                all_proposals.extend(proposals);
+            }
+            all_proposals.extend(py_cached);
+        }
+    }
+
+    // Persist updated cache entries (E8.1).
+    if cache_dirty {
+        if let Err(e) = save_cache(&cache, &cache_file_path) {
+            eprintln!("scan: warning — could not save cache: {e}");
         }
     }
 
     // Apply quality-loop feedback: confidence multipliers + name hints (E6.3).
-    let catalog_path = cwd.join(&config.catalog);
     let feedback = FeedbackStore::load(&quality_path(&catalog_path)).unwrap_or_default();
 
     for proposal in &mut all_proposals {
