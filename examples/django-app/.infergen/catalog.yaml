@@ -1,0 +1,39 @@
+schemaVersion: 1
+events:
+  - id: evt_example_0001
+    name: view_requested
+    status: proposed
+    confidence: 0.9
+    description: "A Django view is requested."
+    adapter: django
+    properties:
+      - name: view_name
+        type: string
+        required: true
+        pii: false
+      - name: method
+        type: string
+        required: true
+        pii: false
+  - id: evt_example_0002
+    name: user_login_attempted
+    status: proposed
+    confidence: 0.85
+    description: "User attempts to log in via Django auth."
+    adapter: django
+    properties:
+      - name: success
+        type: boolean
+        required: true
+        pii: false
+  - id: evt_example_0003
+    name: form_submitted
+    status: proposed
+    confidence: 0.8
+    description: "A Django form is submitted and validated."
+    adapter: django
+    properties:
+      - name: form_class
+        type: string
+        required: false
+        pii: false
