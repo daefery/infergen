@@ -11,7 +11,7 @@ use infergen_types::{
     FlowStep, CATALOG_SCHEMA_VERSION,
 };
 
-use crate::{Error, ProposedEvent, Result, adapter::EventKind};
+use crate::{Error, ProposedEvent, Result, adapter::EventKind, migration::migrate_catalog};
 
 // ---------------------------------------------------------------------------
 // Stable ID generation
@@ -157,10 +157,11 @@ pub fn merge_proposals(
 ///   [`Catalog`] schema.
 pub fn load_catalog(path: &Path) -> Result<Catalog> {
     let text = std::fs::read_to_string(path).map_err(Error::Io)?;
-    serde_yaml::from_str(&text).map_err(|e| Error::CatalogParse {
+    let catalog = serde_yaml::from_str(&text).map_err(|e| Error::CatalogParse {
         path: path.to_path_buf(),
         message: e.to_string(),
-    })
+    })?;
+    migrate_catalog(path, catalog)
 }
 
 /// Serialize a [`Catalog`] to YAML and write it to `path`.
@@ -901,5 +902,40 @@ mod tests {
         assign_flows(&mut catalog, &[], &proposals, root);
         // Empty detected → no auto_flow_ids → all existing flows preserved.
         assert_eq!(catalog.flows.len(), 1, "existing flows must be preserved when detected is empty");
+    }
+
+    // ---------------------------------------------------------------------------
+    // load_catalog + migration tests (E8.3)
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn load_catalog_valid_v1() {
+        use tempfile::NamedTempFile;
+        use std::io::Write;
+        let mut f = NamedTempFile::new().unwrap();
+        writeln!(f, "schemaVersion: 1\nevents: []").unwrap();
+        let cat = load_catalog(f.path()).unwrap();
+        assert_eq!(cat.schema_version, 1);
+        assert!(cat.events.is_empty());
+    }
+
+    #[test]
+    fn load_catalog_too_new_fails() {
+        use tempfile::NamedTempFile;
+        use std::io::Write;
+        let mut f = NamedTempFile::new().unwrap();
+        writeln!(f, "schemaVersion: 999\nevents: []").unwrap();
+        let err = load_catalog(f.path()).unwrap_err();
+        assert!(err.to_string().contains("newer than this infergen binary"), "err: {err}");
+    }
+
+    #[test]
+    fn load_catalog_schema_zero_fails() {
+        use tempfile::NamedTempFile;
+        use std::io::Write;
+        let mut f = NamedTempFile::new().unwrap();
+        writeln!(f, "schemaVersion: 0\nevents: []").unwrap();
+        let err = load_catalog(f.path()).unwrap_err();
+        assert!(err.to_string().contains("unknown catalog schema version"), "err: {err}");
     }
 }

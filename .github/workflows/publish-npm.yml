@@ -1,0 +1,50 @@
+# Publish @infergen/runtime to npm on release tag.
+#
+# Triggered by the same semver tag pattern as cargo-dist's release.yml so both
+# pipelines run in parallel on a version push.
+#
+# Prerequisites (set in GitHub repository settings → Secrets):
+#   NPM_TOKEN: npm automation token with publish access for @infergen scope.
+
+name: Publish npm
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-*'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish-runtime:
+    name: Publish @infergen/runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build @infergen/runtime
+        run: pnpm --filter @infergen/runtime build
+
+      - name: Test @infergen/runtime
+        run: pnpm --filter @infergen/runtime test
+
+      - name: Publish to npm
+        run: pnpm --filter @infergen/runtime publish --no-git-checks --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
