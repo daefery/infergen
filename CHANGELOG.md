@@ -7,19 +7,9 @@ Infergen adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [1.0.0] — 2026-06-09
 
-### Added
-- E8.3: Catalog schema version validation + migration framework — `load_catalog` now rejects catalogs written by a newer Infergen binary and provides a structured upgrade path for future schema versions
-- E8.3: `cargo-release` config (`release.toml`) for workspace-wide version bumping with automatic CHANGELOG promotion and npm version sync
-- E8.3: npm publish CI workflow (`.github/workflows/publish-npm.yml`) for `@infergen/runtime` on release tag
-- E8.3: `scripts/bump-version.sh` helper to sync Cargo workspace version with npm packages
-
----
-
-## [0.1.0] — Upcoming
-
-First versioned release. Full feature set across Milestones 0–8.3:
+First stable release. Full feature set across Milestones 0–8.
 
 ### Added
 
@@ -73,8 +63,13 @@ First versioned release. Full feature set across Milestones 0–8.3:
 - E7.4: Data-collection manifest export — privacy/compliance YAML listing all collected events, properties, PII flags, and destinations; `infergen manifest` command
 - E7.5: Per-stack `init` templates (Next.js, Express, Django, FastAPI, Rails, Go) + quickstart scaffolding; time-to-first-event < 5 minutes
 
-**Milestone 8 (partial)**
-- E8.3: Distribution & versioning infrastructure (this release)
+**Milestone 8 — Hardening & Release**
+- E8.1: Parallel scanning with Rayon + incremental AST cache (mtime + content-hash); large repo scan time reduced ~4–8×
+- E8.2: Golden-file adapter tests, real-world fixture repos, codegen snapshot tests, runtime delivery integration tests
+- E8.3: `cargo-release` workspace config, npm publish CI workflow, `scripts/bump-version.sh`, catalog schema migration framework
+- E8.4: Full documentation site, API reference, adapter gallery, migration guides from Typewriter/Avo
+- E8.5: Version 1.0.0 tag, README rewrite, CHANGELOG creation, workspace keywords/description for crates.io
 
-[Unreleased]: https://github.com/infergen/infergen/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/infergen/infergen/releases/tag/v0.1.0
+---
+
+[1.0.0]: https://github.com/infergen/infergen/releases/tag/v1.0.0

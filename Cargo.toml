@@ -3,17 +3,19 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.0.0"
+version = "1.0.0"
 edition = "2024"
 rust-version = "1.94"
 license = "Apache-2.0"
 repository = "https://github.com/infergen/infergen"
 authors = ["Infergen contributors"]
+description = "Scan any codebase, infer a typed analytics catalog, generate type-safe multi-provider SDKs."
+keywords    = ["analytics", "telemetry", "event-catalog", "codegen", "instrumentation"]
 
 [workspace.dependencies]
 # Internal crates
-infergen-types = { path = "crates/infergen-types", version = "0.0.0" }
-infergen-core  = { path = "crates/infergen-core", version = "0.0.0" }
+infergen-types = { path = "crates/infergen-types", version = "1.0.0" }
+infergen-core  = { path = "crates/infergen-core",  version = "1.0.0" }
 # External
 clap      = { version = "4.5", features = ["derive"] }
 anyhow    = "1.0"
